@@ -1,24 +1,32 @@
 /**
  * API Key authentication middleware.
- * Reads the x-api-key header and validates it against API_KEY env variable.
+ *
+ * Accepts key dari 2 sumber:
+ *   1. Header Authorization: Bearer <key>  → SolarWinds Token mode
+ *   2. Header x-api-key: <key>             → Postman / testing
  */
 export function authMiddleware(req, res, next) {
-  const apiKey = req.headers['x-api-key'];
   const expectedKey = process.env.API_KEY;
 
   if (!expectedKey) {
-    // If no key is configured, warn but allow through (dev mode)
     console.warn('[auth] WARNING: API_KEY is not set. Requests are unauthenticated.');
     return next();
   }
 
-  if (!apiKey) {
-    return res.status(401).json({ error: 'Unauthorized: x-api-key header is required' });
+  // 1. Bearer token (SolarWinds)
+  const authHeader = req.headers['authorization'] || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    if (token === expectedKey) return next();
+    return res.status(401).json({ error: 'Unauthorized: Invalid Bearer token' });
   }
 
-  if (apiKey !== expectedKey) {
+  // 2. x-api-key (Postman / manual testing)
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey) {
+    if (apiKey === expectedKey) return next();
     return res.status(401).json({ error: 'Unauthorized: Invalid API key' });
   }
 
-  next();
+  return res.status(401).json({ error: 'Unauthorized: Provide Authorization: Bearer <token> or x-api-key header' });
 }

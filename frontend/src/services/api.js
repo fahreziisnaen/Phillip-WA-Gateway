@@ -12,7 +12,7 @@ const api = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
-    ...(API_KEY && { 'x-api-key': API_KEY }),
+    ...(API_KEY && { 'Authorization': `Bearer ${API_KEY}` }),
   },
   timeout: 15_000,
 });

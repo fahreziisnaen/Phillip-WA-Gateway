@@ -79,9 +79,10 @@ The Vite dev server automatically proxies `/api/*` and `/socket.io/*` to the bac
 
 ## API Reference
 
-All protected endpoints require the header:
+All protected endpoints require one of these headers:
 ```
-x-api-key: <your API_KEY>
+Authorization: Bearer <your API_KEY>   ← SolarWinds Token mode
+x-api-key: <your API_KEY>              ← Postman / manual testing
 ```
 
 ### `GET /status` (public)
@@ -166,7 +167,7 @@ Returns `{ "ok": true }` — used by Docker health checks.
 ```bash
 curl -X POST http://localhost:3000/send-message \
   -H "Content-Type: application/json" \
-  -H "x-api-key: your_api_key_here" \
+  -H "Authorization: Bearer your_api_key_here" \
   -d '{
     "message": "*Alert:* Router01 is DOWN",
     "id": "628123456789"
@@ -178,7 +179,7 @@ curl -X POST http://localhost:3000/send-message \
 ```bash
 curl -X POST http://localhost:3000/send-message \
   -H "Content-Type: application/json" \
-  -H "x-api-key: your_api_key_here" \
+  -H "Authorization: Bearer your_api_key_here" \
   -d '{
     "message": "Scheduled maintenance in 30 minutes",
     "id": "120363025600132873@g.us"
@@ -237,7 +238,7 @@ WA-Gateway/
 
 ## Security Notes
 
-- The `x-api-key` header is required on all write/read endpoints. Set a strong random key (`openssl rand -hex 32`).
+- Auth menggunakan `Authorization: Bearer <key>` (SolarWinds Token mode) atau `x-api-key: <key>` (Postman). Set a strong random key (`openssl rand -hex 32`).
 - The admin dashboard URL (port 3001) should **not** be exposed to the public internet. Place it behind a VPN or firewall.
 - `sessions/` contains WhatsApp credentials — keep it out of version control (`.gitignore` it).
 - The `VITE_API_KEY` is baked into the frontend JS bundle — anyone who can access the UI can see it. This is acceptable for internal tools; for public-facing deployments use a separate auth layer.
