@@ -1,35 +1,65 @@
 import axios from 'axios';
 
-/**
- * In development, Vite proxies /api/* → http://localhost:3000/*
- * In production (Docker), nginx proxies /api/* → http://backend:3000/*
- *
- * VITE_API_KEY is baked in at build time via docker-compose build args.
- */
-const API_KEY = import.meta.env.VITE_API_KEY || '';
-
 const api = axios.create({
   baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-    ...(API_KEY && { 'Authorization': `Bearer ${API_KEY}` }),
-  },
+  headers: { 'Content-Type': 'application/json' },
   timeout: 15_000,
 });
 
-// ── Endpoint helpers ──────────────────────────────────────────────────────────
+// Attach JWT from localStorage to every dashboard request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('wa_token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+});
 
+// Auto-logout on 401
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && window.location.pathname !== '/login') {
+      localStorage.removeItem('wa_token');
+      localStorage.removeItem('wa_user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+export const login = (username, password) =>
+  api.post('/auth/login', { username, password });
+
+// ── Status (legacy) ───────────────────────────────────────────────────────────
 export const fetchStatus = () => api.get('/status');
 
-export const fetchQR = () => api.get('/qr');
+// ── Instances ─────────────────────────────────────────────────────────────────
+export const fetchInstances = () => api.get('/instances');
+export const addInstance = (id, name) => api.post('/instances', { id, name });
+export const removeInstance = (id) => api.delete(`/instances/${id}`);
+export const resetInstance = (id) => api.post(`/instances/${id}/reset`);
+export const fetchInstanceQR = (id) => api.get(`/instances/${id}/qr`);
+export const fetchInstanceGroups = (id) => api.get(`/instances/${id}/groups`);
 
-export const fetchGroups = () => api.get('/groups');
-
+// ── Other dashboard endpoints ─────────────────────────────────────────────────
 export const fetchLogs = (limit = 100) => api.get(`/logs?limit=${limit}`);
 
-export const doResetSession = () => api.post('/reset-session');
+// ── Groups (legacy — now per instance) ───────────────────────────────────────
+export const fetchGroups = (instanceId) => api.get(`/instances/${instanceId}/groups`);
 
-export const sendMessage = (id, message) =>
-  api.post('/send-message', { id, message });
+// ── Users ─────────────────────────────────────────────────────────────────────
+export const fetchUsers = () => api.get('/admin/users');
+export const createUser = (username, password) =>
+  api.post('/admin/users', { username, password });
+export const changePassword = (id, password) =>
+  api.put(`/admin/users/${id}/password`, { password });
+export const deleteUser = (id) => api.delete(`/admin/users/${id}`);
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+export const fetchApiKeys = () => api.get('/admin/apikeys');
+export const createApiKey = (name) => api.post('/admin/apikeys', { name });
+export const revokeApiKey = (id) => api.delete(`/admin/apikeys/${id}`);
 
 export default api;

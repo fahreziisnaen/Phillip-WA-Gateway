@@ -1,20 +1,27 @@
-# ── Build stage ───────────────────────────────────────────────────────────────
+# ── Stage 1: Build (installs native addons) ────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Build tools needed for native Node.js addons (libsignal, sharp, etc.)
+RUN apk add --no-cache python3 make g++ git
+
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+# ── Stage 2: Production image (lean — no build tools) ─────────────────────────
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Build tools needed for native Node.js addons (sharp, libsignal, etc.)
-RUN apk add --no-cache python3 make g++ git
+# Copy installed modules from builder stage
+COPY --from=builder /app/node_modules ./node_modules
 
-# Install dependencies first (layer cache)
-COPY package.json ./
-RUN npm install --omit=dev
-
-# Copy source
+# Copy application source
 COPY . .
 
-# Create runtime directories
-RUN mkdir -p sessions logs
+# Pre-create runtime directories (bind-mounted volumes override these at runtime)
+RUN mkdir -p sessions logs data
 
 EXPOSE 3000
 

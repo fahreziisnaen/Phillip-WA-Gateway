@@ -1,33 +1,27 @@
-import { sendMessage } from '../whatsapp.js';
+import { sendMessage } from './waManager.js';
 import { addLog } from './log.service.js';
 
-// ── Try to connect Redis / BullMQ ─────────────────────────────────────────────
-// If Redis is not available, fall back to direct (in-process) sending with retry.
-
-let enqueueMessage;
-
-async function sendWithRetry(jid, message, originalId, maxAttempts = 3) {
+async function sendWithRetry(instanceId, instancePhone, jid, recipientName, message, originalId, sourceIp, maxAttempts = 3) {
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await sendMessage(jid, message);
-      await addLog({ id: originalId, message, status: 'success', error: null });
-      console.log(`[queue:direct] Sent to ${jid} (attempt ${attempt})`);
+      await sendMessage(instanceId, jid, message);
+      await addLog({ instanceId, instancePhone, id: originalId, recipientName, message, status: 'success', error: null, sourceIp });
+      console.log(`[queue:direct] [${instanceId}] Sent to ${jid} (attempt ${attempt})`);
       return `direct-${Date.now()}`;
     } catch (err) {
       lastErr = err;
-      console.warn(`[queue:direct] Attempt ${attempt} failed: ${err.message}`);
-      if (attempt < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 2000 * attempt)); // 2s, 4s
-      }
+      console.warn(`[queue:direct] [${instanceId}] Attempt ${attempt} failed: ${err.message}`);
+      if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 2000 * attempt));
     }
   }
-  await addLog({ id: originalId, message, status: 'failed', error: lastErr.message });
+  await addLog({ instanceId, instancePhone, id: originalId, recipientName, message, status: 'failed', error: lastErr.message, sourceIp });
   throw lastErr;
 }
 
+let enqueueMessage;
+
 try {
-  // Dynamically import BullMQ + ioredis so failure doesn't crash the app
   const { Queue, Worker } = await import('bullmq');
   const { default: IORedis } = await import('ioredis');
 
@@ -37,10 +31,9 @@ try {
     maxRetriesPerRequest: null,
     lazyConnect: true,
     connectTimeout: 3000,
-    retryStrategy: () => null, // don't auto-retry on startup
+    retryStrategy: () => null,
   });
 
-  // Test the connection before committing to BullMQ mode
   await connection.connect();
   await connection.ping();
 
@@ -57,42 +50,42 @@ try {
   const worker = new Worker(
     'wa-messages',
     async (job) => {
-      const { jid, message, originalId } = job.data;
-      console.log(`[queue:bullmq] Processing job ${job.id} → ${jid}`);
-      await sendMessage(jid, message);
-      await addLog({ id: originalId, message, status: 'success', error: null });
+      const { instanceId, instancePhone, jid, recipientName, message, originalId, sourceIp } = job.data;
+      console.log(`[queue:bullmq] [${instanceId}] Processing job ${job.id} → ${jid}`);
+      await sendMessage(instanceId, jid, message);
+      await addLog({ instanceId, instancePhone, id: originalId, recipientName, message, status: 'success', error: null, sourceIp });
     },
-    { connection, concurrency: 3 }
+    { connection, concurrency: 5 }
   );
 
   worker.on('failed', async (job, err) => {
-    console.error(`[queue:bullmq] Job ${job?.id} failed:`, err.message);
     if (job && job.attemptsMade >= (job.opts?.attempts ?? 3)) {
       await addLog({
+        instanceId: job.data.instanceId,
+        instancePhone: job.data.instancePhone,
         id: job.data.originalId,
+        recipientName: job.data.recipientName,
         message: job.data.message,
         status: 'failed',
         error: err.message,
+        sourceIp: job.data.sourceIp,
       });
     }
   });
 
   worker.on('error', (err) => console.error('[queue:bullmq] Worker error:', err.message));
-
   console.log('[queue] BullMQ + Redis mode active');
 
-  enqueueMessage = async (jid, message, originalId) => {
-    const job = await messageQueue.add('send', { jid, message, originalId });
-    console.log(`[queue:bullmq] Enqueued job ${job.id} for ${jid}`);
+  enqueueMessage = async (instanceId, instancePhone, jid, recipientName, message, originalId, sourceIp) => {
+    const job = await messageQueue.add('send', { instanceId, instancePhone, jid, recipientName, message, originalId, sourceIp });
     return job.id;
   };
 
 } catch (err) {
   console.warn(`[queue] Redis not available (${err.message}) — using direct send mode`);
 
-  enqueueMessage = async (jid, message, originalId) => {
-    // Fire-and-forget with retry, don't block the HTTP response
-    setImmediate(() => sendWithRetry(jid, message, originalId).catch(() => {}));
+  enqueueMessage = async (instanceId, instancePhone, jid, recipientName, message, originalId, sourceIp) => {
+    setImmediate(() => sendWithRetry(instanceId, instancePhone, jid, recipientName, message, originalId, sourceIp).catch(() => {}));
     return `direct-${Date.now()}`;
   };
 }

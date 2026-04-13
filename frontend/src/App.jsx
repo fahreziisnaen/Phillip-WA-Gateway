@@ -1,58 +1,79 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+import socket from './services/socket.js';
 import Layout from './components/Layout.jsx';
 import Dashboard from './pages/Dashboard.jsx';
-import QRPage from './pages/QRPage.jsx';
+import Instances from './pages/Instances.jsx';
 import Groups from './pages/Groups.jsx';
 import Logs from './pages/Logs.jsx';
+import Settings from './pages/Settings.jsx';
+import Login from './pages/Login.jsx';
 import { fetchStatus } from './services/api.js';
 
-// Connect Socket.IO to the same origin (nginx proxies /socket.io/ → backend)
-const socket = io('/', {
-  path: '/socket.io',
-  transports: ['websocket', 'polling'],
-  reconnectionDelay: 3000,
-  reconnectionAttempts: Infinity,
-});
-
-const INITIAL_STATUS = { status: 'disconnected', phone: null, name: null };
-
-export default function App() {
-  const [status, setStatus] = useState(INITIAL_STATUS);
+function ProtectedApp() {
+  const { isLoggedIn } = useAuth();
+  const [instances, setInstances] = useState([]);
   const [socketConnected, setSocketConnected] = useState(false);
 
-  // Fetch initial status via HTTP so the UI is accurate on first load
   useEffect(() => {
+    if (!isLoggedIn) return;
     fetchStatus()
-      .then((res) => setStatus(res.data))
-      .catch(() => {}); // ignore — socket will update soon
-  }, []);
+      .then((res) => setInstances(res.data.instances ?? []))
+      .catch(() => {});
+  }, [isLoggedIn]);
 
   useEffect(() => {
     socket.on('connect', () => setSocketConnected(true));
     socket.on('disconnect', () => setSocketConnected(false));
 
-    // Real-time WhatsApp connection updates
-    socket.on('status', (data) => {
-      setStatus((prev) => ({ ...prev, ...data }));
+    // Update instance in list when status changes
+    socket.on('instance_status', (data) => {
+      setInstances((prev) => {
+        const idx = prev.findIndex((i) => i.id === data.id);
+        if (idx === -1) return [...prev, data];
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...data };
+        return next;
+      });
     });
 
     return () => {
       socket.off('connect');
       socket.off('disconnect');
-      socket.off('status');
+      socket.off('instance_status');
     };
   }, []);
 
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+
   return (
-    <Layout status={status} socketConnected={socketConnected}>
+    <Layout instances={instances} socketConnected={socketConnected}>
       <Routes>
-        <Route path="/" element={<Dashboard status={status} />} />
-        <Route path="/qr" element={<QRPage status={status} />} />
+        <Route path="/" element={<Dashboard instances={instances} />} />
+        <Route path="/instances" element={<Instances />} />
         <Route path="/groups" element={<Groups />} />
         <Route path="/logs" element={<Logs />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
   );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<PublicLogin />} />
+        <Route path="/*" element={<ProtectedApp />} />
+      </Routes>
+    </AuthProvider>
+  );
+}
+
+function PublicLogin() {
+  const { isLoggedIn } = useAuth();
+  if (isLoggedIn) return <Navigate to="/" replace />;
+  return <Login />;
 }

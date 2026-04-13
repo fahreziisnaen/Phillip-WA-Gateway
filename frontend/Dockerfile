@@ -7,8 +7,8 @@ WORKDIR /app
 ARG VITE_API_KEY=""
 ENV VITE_API_KEY=$VITE_API_KEY
 
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json* ./
+RUN npm ci
 
 COPY . .
 RUN npm run build
