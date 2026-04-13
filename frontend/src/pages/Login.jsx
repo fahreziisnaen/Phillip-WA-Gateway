@@ -99,10 +99,6 @@ export default function Login() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-4">
-          Default: <code className="bg-gray-100 px-1 rounded">admin</code> /{' '}
-          <code className="bg-gray-100 px-1 rounded">admin123</code>
-        </p>
       </div>
     </div>
   );
