@@ -38,10 +38,25 @@ function ProtectedApp() {
       });
     });
 
+    // Add new instance to list immediately when created
+    socket.on('instance_added', (data) => {
+      setInstances((prev) => {
+        if (prev.find((i) => i.id === data.id)) return prev;
+        return [...prev, data];
+      });
+    });
+
+    // Remove instance from list immediately when deleted
+    socket.on('instance_removed', ({ id }) => {
+      setInstances((prev) => prev.filter((i) => i.id !== id));
+    });
+
     return () => {
       socket.off('connect');
       socket.off('disconnect');
       socket.off('instance_status');
+      socket.off('instance_added');
+      socket.off('instance_removed');
     };
   }, []);
 

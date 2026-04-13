@@ -44,7 +44,12 @@ export const fetchInstanceQR = (id) => api.get(`/instances/${id}/qr`);
 export const fetchInstanceGroups = (id) => api.get(`/instances/${id}/groups`);
 
 // ── Other dashboard endpoints ─────────────────────────────────────────────────
-export const fetchLogs = (limit = 100) => api.get(`/logs?limit=${limit}`);
+export const fetchLogs = ({ limit = 2000, from, to } = {}) => {
+  const params = new URLSearchParams({ limit });
+  if (from) params.set('from', from);
+  if (to)   params.set('to', to);
+  return api.get(`/logs?${params}`);
+};
 
 // ── Groups (legacy — now per instance) ───────────────────────────────────────
 export const fetchGroups = (instanceId) => api.get(`/instances/${instanceId}/groups`);

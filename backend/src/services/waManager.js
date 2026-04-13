@@ -98,7 +98,6 @@ async function connectInstance(id) {
     const sock = makeWASocket({
       version,
       logger,
-      printQRInTerminal: true,
       auth: {
         creds: state.creds,
         keys: makeCacheableSignalKeyStore(state.keys, logger),
@@ -246,6 +245,10 @@ export async function addInstance(id, name) {
     qr: null, phone: null, waName: null,
   });
   await savePersistedInstances();
+  // Notify dashboard immediately so the new instance appears in the list
+  if (ioInstance) {
+    ioInstance.emit('instance_added', { id, name, status: 'disconnected', phone: null, waName: null });
+  }
   connectInstance(id);
 }
 
@@ -259,7 +262,13 @@ export async function removeInstance(id) {
   } catch (_) {}
 
   instances.delete(id);
+  contactsCache.delete(id);
   await savePersistedInstances();
+
+  // Notify dashboard so the instance is removed from the list immediately
+  if (ioInstance) {
+    ioInstance.emit('instance_removed', { id });
+  }
 
   // Remove session files
   const sessionDir = path.join(SESSIONS_ROOT, id);

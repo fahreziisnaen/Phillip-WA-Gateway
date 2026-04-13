@@ -7,6 +7,7 @@ import cors from 'cors';
 import { initManager } from './services/waManager.js';
 import { registerRoutes } from './routes/index.js';
 import { rateLimitMiddleware } from './middlewares/rateLimit.middleware.js';
+import { cleanOldLogs } from './services/log.service.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,4 +36,8 @@ httpServer.listen(PORT, () => {
   initManager(io).catch((err) => {
     console.error('[server] Failed to init WhatsApp manager:', err);
   });
+
+  // Clean logs older than 90 days on startup, then once every 24 hours
+  cleanOldLogs();
+  setInterval(cleanOldLogs, 24 * 60 * 60 * 1000);
 });

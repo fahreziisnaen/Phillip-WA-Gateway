@@ -76,7 +76,6 @@ export default function Instances() {
 
   useEffect(() => {
     function onInstanceStatus(data) {
-      // Update the instance list
       setInstances((prev) => {
         const idx = prev.findIndex((i) => i.id === data.id);
         if (idx === -1) return [...prev, data];
@@ -85,7 +84,7 @@ export default function Instances() {
         return next;
       });
 
-      // If QR modal is open for this instance and it just connected → close + celebrate
+      // If QR modal is open for this instance and it just connected → show success
       setQrModal((prev) => {
         if (!prev || prev.id !== data.id) return prev;
         if (data.status === 'connected') {
@@ -96,8 +95,30 @@ export default function Instances() {
       });
     }
 
+    function onInstanceAdded(data) {
+      setInstances((prev) => {
+        if (prev.find((i) => i.id === data.id)) return prev;
+        return [...prev, data];
+      });
+    }
+
+    function onInstanceRemoved({ id }) {
+      setInstances((prev) => prev.filter((i) => i.id !== id));
+      // Close QR modal if it was open for the removed instance
+      setQrModal((prev) => {
+        if (prev?.id === id) { stopQrPoll(); return null; }
+        return prev;
+      });
+    }
+
     socket.on('instance_status', onInstanceStatus);
-    return () => socket.off('instance_status', onInstanceStatus);
+    socket.on('instance_added', onInstanceAdded);
+    socket.on('instance_removed', onInstanceRemoved);
+    return () => {
+      socket.off('instance_status', onInstanceStatus);
+      socket.off('instance_added', onInstanceAdded);
+      socket.off('instance_removed', onInstanceRemoved);
+    };
   }, []);
 
   // ── QR polling ──────────────────────────────────────────────────────────────
@@ -399,7 +420,7 @@ export default function Instances() {
       {/* ── QR Modal ── */}
       {qrModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xs overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
@@ -459,11 +480,11 @@ export default function Instances() {
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                         Live — refreshes every 3s
                       </div>
-                      <div className="inline-block p-2 border-2 border-gray-200 rounded-xl shadow-inner bg-white">
+                      <div className="inline-block p-3 border-2 border-gray-200 rounded-xl shadow-inner bg-white">
                         <img
                           src={qrModal.qr}
                           alt="WhatsApp QR Code"
-                          className="w-52 h-52 object-contain"
+                          className="w-72 h-72 object-contain"
                         />
                       </div>
                     </div>
