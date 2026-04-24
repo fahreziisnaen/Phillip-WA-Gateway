@@ -23,6 +23,11 @@ import {
   createKeyController,
   revokeKeyController,
 } from '../controllers/settings.controller.js';
+import {
+  listGroupAliasesController,
+  setGroupAliasController,
+  deleteGroupAliasController,
+} from '../controllers/groupAlias.controller.js';
 
 export function registerRoutes(app) {
   // ── Public ──────────────────────────────────────────────────────────────────
@@ -59,6 +64,11 @@ export function registerRoutes(app) {
   app.get('/admin/apikeys', jwtMiddleware, getKeysController);
   app.post('/admin/apikeys', jwtMiddleware, createKeyController);
   app.delete('/admin/apikeys/:id', jwtMiddleware, revokeKeyController);
+
+  // Group Aliases
+  app.get('/admin/group-aliases', jwtMiddleware, listGroupAliasesController);
+  app.post('/admin/group-aliases', jwtMiddleware, setGroupAliasController);
+  app.delete('/admin/group-aliases/:alias', jwtMiddleware, deleteGroupAliasController);
 
   // ── 404 ─────────────────────────────────────────────────────────────────────
   app.use((req, res) => {

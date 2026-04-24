@@ -67,4 +67,11 @@ export const fetchApiKeys = () => api.get('/admin/apikeys');
 export const createApiKey = (name) => api.post('/admin/apikeys', { name });
 export const revokeApiKey = (id) => api.delete(`/admin/apikeys/${id}`);
 
+// ── Group Aliases ──────────────────────────────────────────────────────────────
+export const fetchGroupAliases = () => api.get('/admin/group-aliases');
+export const setGroupAlias = (alias, jid, label) =>
+  api.post('/admin/group-aliases', { alias, jid, label });
+export const deleteGroupAlias = (alias) =>
+  api.delete(`/admin/group-aliases/${encodeURIComponent(alias)}`);
+
 export default api;

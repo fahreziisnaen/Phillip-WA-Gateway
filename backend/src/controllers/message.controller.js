@@ -1,5 +1,6 @@
 import { normalizeId } from '../utils/idNormalizer.js';
 import { validateNumber, getFirstConnectedInstance, getInstance, getRecipientName } from '../services/waManager.js';
+import { resolveAlias } from '../services/groupAlias.service.js';
 import { enqueueMessage } from '../services/queue.service.js';
 import { addLog } from '../services/log.service.js';
 
@@ -71,10 +72,15 @@ export async function sendMessageController(req, res) {
     }
   }
 
+  // ── Resolve group alias → JID ────────────────────────────────────────────────
+  let effectiveId = id.trim();
+  const aliasJid = await resolveAlias(effectiveId);
+  if (aliasJid) effectiveId = aliasJid;
+
   // ── Normalize destination ID ─────────────────────────────────────────────────
   let normalised;
   try {
-    normalised = normalizeId(id.trim());
+    normalised = normalizeId(effectiveId);
   } catch (err) {
     await addLog({
       sourceIp, instanceId: instance.id, instancePhone: instance.phone,

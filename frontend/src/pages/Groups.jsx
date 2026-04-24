@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Search, Copy, Check, RefreshCw, Info, Smartphone } from 'lucide-react';
-import { fetchInstances, fetchGroups } from '../services/api.js';
+import { Users, Search, Copy, Check, RefreshCw, Info, Smartphone, Hash, X, Plus } from 'lucide-react';
+import { fetchInstances, fetchGroups, setGroupAlias } from '../services/api.js';
 
 export default function Groups() {
   const [instances, setInstances] = useState([]);
@@ -10,6 +10,7 @@ export default function Groups() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState(null);
+  const [aliasModal, setAliasModal] = useState(null); // { id, name }
 
   // Load connected instances
   useEffect(() => {
@@ -133,7 +134,8 @@ export default function Groups() {
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-2.5">
         <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-blue-700">
-          <strong>Read-only.</strong> Copy Group ID and use it as <code className="bg-blue-100 px-1 rounded text-xs">id</code> in{' '}
+          Copy Group ID atau klik <strong>Set Alias</strong> untuk membuat nama pendek yang bisa dipakai
+          sebagai <code className="bg-blue-100 px-1 rounded text-xs">id</code> di{' '}
           <code className="bg-blue-100 px-1 rounded text-xs">POST /send-message</code>.
         </p>
       </div>
@@ -181,17 +183,140 @@ export default function Groups() {
                   <p className="text-sm font-medium text-gray-800 truncate">{group.name}</p>
                   <p className="text-xs font-mono text-gray-400 truncate">{group.id}</p>
                 </div>
-                <button
-                  onClick={() => copyToClipboard(group.id)}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all px-2 py-1 rounded-md hover:bg-gray-100"
-                >
-                  {copied === group.id
-                    ? <><Check className="w-3.5 h-3.5 text-green-500" /><span className="text-green-600">Copied</span></>
-                    : <><Copy className="w-3.5 h-3.5" /><span>Copy ID</span></>}
-                </button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all">
+                  <button
+                    onClick={() => setAliasModal({ id: group.id, name: group.name })}
+                    className="flex items-center gap-1 text-xs text-wa-teal hover:text-wa-green hover:bg-wa-green/10 px-2 py-1.5 rounded-md transition-colors"
+                  >
+                    <Hash className="w-3.5 h-3.5" />
+                    <span>Set Alias</span>
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(group.id)}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 px-2 py-1 rounded-md hover:bg-gray-100 transition-all"
+                  >
+                    {copied === group.id
+                      ? <><Check className="w-3.5 h-3.5 text-green-500" /><span className="text-green-600">Copied</span></>
+                      : <><Copy className="w-3.5 h-3.5" /><span>Copy ID</span></>}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      {/* Alias modal */}
+      {aliasModal && (
+        <AliasModal
+          group={aliasModal}
+          onClose={() => setAliasModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function AliasModal({ group, onClose }) {
+  const [alias, setAlias] = useState('');
+  const [label, setLabel] = useState(group.name);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (!alias.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await setGroupAlias(alias.trim(), group.id, label.trim());
+      setSuccess(true);
+      setTimeout(onClose, 1200);
+    } catch (err) {
+      setError(err.response?.data?.error ?? 'Gagal menyimpan alias');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Hash className="w-4 h-4 text-wa-teal" />
+            <h2 className="text-base font-semibold text-gray-900">Set Group Alias</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="bg-gray-50 rounded-lg px-3 py-2 mb-4">
+          <p className="text-xs text-gray-500 mb-0.5">Group</p>
+          <p className="text-sm font-medium text-gray-800 truncate">{group.name}</p>
+          <p className="text-xs font-mono text-gray-400 truncate">{group.id}</p>
+        </div>
+
+        {success ? (
+          <div className="flex items-center gap-2 text-green-600 py-2">
+            <Check className="w-4 h-4" />
+            <span className="text-sm font-medium">Alias berhasil disimpan!</span>
+          </div>
+        ) : (
+          <form onSubmit={handleSave} className="space-y-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">
+                Nama Alias <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="misal: alert-it"
+                value={alias}
+                onChange={(e) => setAlias(e.target.value)}
+                pattern="[a-zA-Z0-9_\-]+"
+                title="Hanya huruf, angka, underscore, dan tanda hubung"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
+                autoFocus
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Alias ini yang akan dipakai sebagai <code className="bg-gray-100 px-1 rounded">id</code> saat POST.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Label (opsional)</label>
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
+              />
+            </div>
+
+            {error && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !alias.trim()}
+                className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-wa-green hover:bg-wa-teal disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                {saving ? 'Menyimpan…' : 'Simpan'}
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </div>

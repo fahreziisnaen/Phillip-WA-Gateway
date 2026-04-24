@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   X,
+  Hash,
 } from 'lucide-react';
 import {
   fetchUsers,
@@ -23,12 +24,16 @@ import {
   fetchApiKeys,
   createApiKey,
   revokeApiKey,
+  fetchGroupAliases,
+  setGroupAlias,
+  deleteGroupAlias,
 } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const TABS = [
   { id: 'apikeys', label: 'API Keys', Icon: Key },
   { id: 'users', label: 'Users', Icon: Users },
+  { id: 'aliases', label: 'Group Aliases', Icon: Hash },
 ];
 
 export default function Settings() {
@@ -64,6 +69,7 @@ export default function Settings() {
 
       {tab === 'apikeys' && <ApiKeysTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'aliases' && <GroupAliasesTab />}
     </div>
   );
 }
@@ -458,6 +464,211 @@ function UsersTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Group Aliases Tab ─────────────────────────────────────────────────────────
+
+function GroupAliasesTab() {
+  const [aliases, setAliases] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [flash, setFlash] = useState(null);
+  const [form, setForm] = useState({ alias: '', jid: '', label: '' });
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetchGroupAliases();
+      setAliases(res.data);
+    } catch (err) {
+      showFlash('error', err.response?.data?.error ?? 'Gagal memuat group aliases');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function showFlash(type, text) {
+    setFlash({ type, text });
+    setTimeout(() => setFlash(null), 4000);
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (!form.alias.trim() || !form.jid.trim()) return;
+    setSaving(true);
+    try {
+      await setGroupAlias(form.alias.trim(), form.jid.trim(), form.label.trim());
+      showFlash('success', `Alias "${form.alias.trim()}" berhasil disimpan`);
+      setForm({ alias: '', jid: '', label: '' });
+      await load();
+    } catch (err) {
+      showFlash('error', err.response?.data?.error ?? 'Gagal menyimpan alias');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(alias) {
+    if (!window.confirm(`Hapus alias "${alias}"?`)) return;
+    try {
+      await deleteGroupAlias(alias);
+      showFlash('success', `Alias "${alias}" dihapus`);
+      await load();
+    } catch (err) {
+      showFlash('error', err.response?.data?.error ?? 'Gagal menghapus alias');
+    }
+  }
+
+  async function copyAlias(text) {
+    await navigator.clipboard.writeText(text);
+    setCopied(text);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  return (
+    <div className="space-y-4">
+      {flash && <Flash flash={flash} />}
+
+      {/* Info */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-700">
+        <p className="font-semibold mb-1">Apa itu Group Alias?</p>
+        <p className="text-xs text-blue-600">
+          Alias memungkinkan client mengirim pesan ke grup WhatsApp menggunakan nama pendek
+          (misalnya <code className="bg-blue-100 px-1 rounded font-mono">alert-it</code>) tanpa
+          perlu mengetahui Group ID panjang (<code className="bg-blue-100 px-1 rounded font-mono">120363...@g.us</code>).
+          Gunakan nama alias sebagai nilai field <code className="bg-blue-100 px-1 rounded font-mono">id</code> saat POST ke{' '}
+          <code className="bg-blue-100 px-1 rounded font-mono">/send-message</code>.
+        </p>
+      </div>
+
+      {/* Form tambah/update alias */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <h2 className="text-sm font-semibold text-gray-800 mb-3">Tambah / Update Alias</h2>
+        <form onSubmit={handleSave} className="space-y-3">
+          <div className="flex gap-2 flex-wrap">
+            <div className="flex-1 min-w-36">
+              <label className="block text-xs text-gray-500 mb-1">Nama Alias <span className="text-red-400">*</span></label>
+              <input
+                type="text"
+                placeholder="misal: alert-it"
+                value={form.alias}
+                onChange={(e) => setForm({ ...form, alias: e.target.value })}
+                pattern="[a-zA-Z0-9_\-]+"
+                title="Hanya huruf, angka, underscore, dan tanda hubung"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition font-mono"
+                required
+              />
+            </div>
+            <div className="flex-[2] min-w-48">
+              <label className="block text-xs text-gray-500 mb-1">Group JID <span className="text-red-400">*</span></label>
+              <input
+                type="text"
+                placeholder="120363xxxxxxxxxx@g.us"
+                value={form.jid}
+                onChange={(e) => setForm({ ...form, jid: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition font-mono"
+                required
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">Label (opsional)</label>
+              <input
+                type="text"
+                placeholder="Keterangan nama grup"
+                value={form.label}
+                onChange={(e) => setForm({ ...form, label: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={saving || !form.alias.trim() || !form.jid.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-wa-green hover:bg-wa-teal disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors shadow-sm whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              {saving ? 'Menyimpan…' : 'Simpan Alias'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">
+            Jika alias sudah ada, data akan di-update. Salin Group JID dari halaman{' '}
+            <a href="/groups" className="text-wa-teal underline">Groups</a>.
+          </p>
+        </form>
+      </div>
+
+      {/* Alias list */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">
+            Daftar Alias
+            {aliases.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-gray-400">({aliases.length})</span>
+            )}
+          </h2>
+          <button onClick={load} disabled={loading} className="text-gray-400 hover:text-gray-600">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {!loading && aliases.length === 0 && (
+          <div className="text-center py-10 text-gray-400 text-sm">
+            Belum ada alias. Tambahkan di atas.
+          </div>
+        )}
+
+        {aliases.length > 0 && (
+          <ul className="divide-y divide-gray-50">
+            {aliases.map((a) => (
+              <li key={a.alias} className="flex items-center gap-4 px-5 py-3.5 group">
+                <div className="w-8 h-8 bg-wa-green/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Hash className="w-4 h-4 text-wa-teal" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <code className="text-sm font-mono font-semibold text-gray-800">{a.alias}</code>
+                    {a.label && (
+                      <span className="text-xs text-gray-400 truncate">— {a.label}</span>
+                    )}
+                  </div>
+                  <p className="text-xs font-mono text-gray-400 truncate mt-0.5">{a.jid}</p>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => copyAlias(a.alias)}
+                    title="Copy alias"
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    {copied === a.alias
+                      ? <Check className="w-3.5 h-3.5 text-green-500" />
+                      : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    onClick={() => setForm({ alias: a.alias, jid: a.jid, label: a.label || '' })}
+                    title="Edit alias"
+                    className="text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(a.alias)}
+                    title="Hapus alias"
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
