@@ -53,6 +53,23 @@ services:
     networks:
       - wa_net
 
+  # ── SQLite Web (database browser) ────────────────────────────────────────
+  sqlite-web:
+    image: coleifer/sqlite-web
+    restart: always
+    ports:
+      - "3002:8080"
+    volumes:
+      - db_data:/data
+    environment:
+      - SQLITE_WEB_PASSWORD=${SQLITE_WEB_PASSWORD:-admin}
+    command: sh -c "sqlite_web -H 0.0.0.0 -p 8080 -P $$SQLITE_WEB_PASSWORD -x /data/gateway.db"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - wa_net
+
   # ── Frontend (React + nginx) ──────────────────────────────────────────────
   frontend:
     build:

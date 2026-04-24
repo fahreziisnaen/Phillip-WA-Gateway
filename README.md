@@ -38,51 +38,87 @@ External System (SolarWinds, PRTG, etc.)
       │  nginx proxies /api/*      → backend:3000
       │  nginx proxies /socket.io/ → backend:3000 (WebSocket)
       └  real-time status via Socket.IO events
+
+  ─────────────────────────────────────────────────────
+  SQLite Web :3002 (coleifer/sqlite-web)
+      └  read/write browser UI for gateway.db (password-protected)
 ```
 
 ---
 
 ## Quick Start (Docker)
 
+### 1. Generate a secure `.env`
+
 ```bash
-# 1. Copy and configure environment
 cp .env.example .env
-# Edit .env — set JWT_SECRET:
-#   openssl rand -hex 32
+```
 
-# 2. Build and launch all services
+Open `.env` and fill in the two required secrets. Use the commands below to generate them:
+
+```bash
+# JWT_SECRET — signs all admin session tokens
+openssl rand -hex 32
+
+# SQLITE_WEB_PASSWORD — login password for the database browser on :3002
+openssl rand -base64 16
+```
+
+Paste the output of each command into the corresponding variable in `.env`.
+
+Your `.env` should look like this when complete:
+
+```env
+JWT_SECRET=a3f8d2e1c7b94f0e2d6a1b8c4e3f5a7d9e2b1c4f6a8d3e5f7b2c9a1d4f6e8b3
+SQLITE_WEB_PASSWORD=Xk9mP2rLqN4wT7vA
+```
+
+> `API_KEY` is optional — leave it blank and create API keys from the dashboard after first login.
+
+### 2. Launch all services
+
+```bash
 docker compose up -d --build
+```
 
-# 3. Watch backend logs
+### 3. Verify startup
+
+```bash
 docker compose logs -f backend
 ```
 
-Open the admin UI at **http://localhost:3001**
+| Service | URL | Notes |
+|---------|-----|-------|
+| Admin dashboard | http://localhost:3001 | Login: `admin` / `admin123` |
+| Backend API | http://localhost:3000 | Direct API access |
+| Database browser | http://localhost:3002 | Login with `SQLITE_WEB_PASSWORD` |
 
-Default login: `admin` / `admin123` — **change this immediately** via Settings → Users.
+> **Change the default admin password immediately** — Settings → Users → change password.
 
 ---
 
 ## First-Time Setup
 
-1. Log in at **http://localhost:3001**
-2. Go to **Instances** → click **Add Instance**
-3. Scan the QR code that appears automatically with WhatsApp on your phone (Settings → Linked Devices → Link a Device)
-4. Once connected, go to **Groups** to find and copy your group IDs
-5. Go to **Settings → API Keys** → generate a key for SolarWinds or any external system
+1. Log in at **http://localhost:3001** (`admin` / `admin123`)
+2. Go to **Settings → Users** → change your password
+3. Go to **Instances** → click **Add Instance**
+4. Scan the QR code that appears with WhatsApp (Settings → Linked Devices → Link a Device)
+5. Once connected, go to **Groups** to find and copy Group IDs or set Aliases
+6. Go to **Settings → API Keys** → generate a key for SolarWinds or any external system
 
 ---
 
 ## Local Development (without Docker)
 
-**Prerequisites:** Node.js 20+, Redis (optional — app falls back to direct send if unavailable)
+**Prerequisites:** Node.js 20+, Redis (optional — falls back to direct send if unavailable)
 
 ### Backend
 
 ```bash
 cd backend
 npm install
-# Create .env (copy from root .env.example, set REDIS_HOST=localhost)
+# Copy and fill in .env (set REDIS_HOST=localhost, DB_PATH=./data/gateway.db)
+cp ../.env.example .env
 npm run dev
 # → http://localhost:3000
 ```
@@ -115,7 +151,7 @@ For `POST /send-message`, authentication is checked in the following order:
 1. **IP Whitelist** — no API key needed if the sender IP is whitelisted (supports single IP, CIDR, wildcard)
 2. **HTTP Header** — `Authorization: Bearer <key>`
 3. **HTTP Header** — `x-api-key: <key>`
-4. **Body Field** — `apikey=<key>` (useful for `application/x-www-form-urlencoded` or systems that cannot set headers)
+4. **Body Field** — `apikey=<key>` (for `application/x-www-form-urlencoded` or systems that cannot set custom headers)
 
 > **Rate limiting:** All endpoints (except `/health`) are limited to **100 requests per minute per IP**.
 
@@ -194,7 +230,7 @@ id=alert-it&message=Hello%20World&apikey=YOUR_API_KEY
 | `message` | Yes | Text to send. Supports WhatsApp markdown: `*bold*`, `_italic_`, `~strikethrough~` |
 | `id` | Yes | Recipient — see accepted formats below |
 | `from` | No | Instance ID to send from (e.g. `wa1`). Defaults to the first connected instance. |
-| `apikey` | No | API key (alternative if headers cannot be set). Not required if the IP is whitelisted. |
+| `apikey` | No | API key (alternative to headers). Not required if the IP is whitelisted. |
 
 **Accepted `id` formats:**
 
@@ -256,14 +292,14 @@ id=alert-it&message=Hello%20World&apikey=YOUR_API_KEY
 { "id": "wa2", "name": "WhatsApp 2" }
 ```
 
-> `id` must only contain letters, numbers, `_`, or `-`.
+> `id` is automatically lowercased and must only contain letters, numbers, `_`, or `-`.
 
 **Response (201):**
 ```json
 { "success": true, "id": "wa2", "name": "WhatsApp 2" }
 ```
 
-After creation, the instance starts connecting and a QR code becomes available immediately.
+After creation, the instance starts connecting and a QR code becomes available via the dashboard and `GET /instances/:id/qr`.
 
 ---
 
@@ -458,7 +494,7 @@ curl -X POST http://localhost:3000/send-message \
   -H "x-api-key: wag_your_api_key_here" \
   -d '{"message": "Test message", "id": "628123456789", "from": "wa1"}'
 
-# Send via form-urlencoded (no custom headers)
+# Send via form-urlencoded (no custom headers — useful for legacy systems)
 curl -X POST http://localhost:3000/send-message \
   -d "apikey=wag_your_api_key_here&id=alert-it&message=Hello"
 
@@ -495,7 +531,7 @@ curl -X POST http://localhost:3000/auth/login \
 |------|------|-------------|
 | Dashboard | `/` | Overview of all instances — status, phone, WhatsApp name |
 | Instances | `/instances` | Add/remove instances, scan QR (real-time via socket), reset session |
-| Groups | `/groups` | Browse and search group IDs per connected instance, set Aliases |
+| Groups | `/groups` | Browse and search group IDs per connected instance, set/edit Aliases |
 | Logs | `/logs` | Message history — status, source IP, instance, recipient, message preview |
 | Docs | `/docs` | Interactive API documentation and request examples |
 | Settings | `/settings` | API Keys, Group Aliases, Allowed IPs (Whitelist), and Users |
@@ -507,6 +543,7 @@ curl -X POST http://localhost:3000/auth/login \
 Multiple WhatsApp accounts run simultaneously. Each instance has its own independent Baileys session in `sessions/<id>/`.
 
 - Add instances from the **Instances** page — provide an ID (e.g. `wa2`) and a display name
+- Instance IDs are always lowercased automatically
 - QR modal opens automatically after adding — scan to link that account
 - Use `"from": "<instance-id>"` in the API body to route through a specific account
 - If `from` is omitted, the first connected instance is used
@@ -529,16 +566,17 @@ All application data is stored in a **SQLite database** (`gateway.db`) persisted
 
 WhatsApp session credentials are stored separately in `sessions/<id>/` (Baileys multi-file auth state) and persisted via a bind mount.
 
-**Inspect the database:**
-```bash
-# Find volume path on host
-docker volume inspect wa-gateway-v2_db_data
+### Database Browser (SQLite Web)
 
-# Open SQLite shell inside container
-docker exec -it <backend-container> sh
-sqlite3 /app/data/gateway.db
-.tables
-SELECT username, role, created_at FROM users;
+A web-based database browser is included and runs at **http://localhost:3002**.
+
+```bash
+# Start the database browser (starts automatically with docker compose up)
+docker compose up -d sqlite-web
+
+# Access at:
+#   http://localhost:3002
+#   Login with the password set in SQLITE_WEB_PASSWORD
 ```
 
 ---
@@ -598,7 +636,7 @@ WA-Gateway/
 │   │   │   ├── Login.jsx
 │   │   │   ├── Dashboard.jsx
 │   │   │   ├── Instances.jsx            # QR modal with real-time socket updates
-│   │   │   ├── Groups.jsx
+│   │   │   ├── Groups.jsx               # Group browser with alias display/edit
 │   │   │   ├── Logs.jsx
 │   │   │   ├── Docs.jsx
 │   │   │   └── Settings.jsx
@@ -617,12 +655,15 @@ WA-Gateway/
 
 ## Security Notes
 
-- **API keys** are stored in the SQLite database — accessible only within the Docker volume
-- **Passwords** are bcrypt-hashed (cost 10) — never stored in plaintext
-- **JWT** sessions expire after 8 hours — set a strong `JWT_SECRET` in `.env`
+- **Secrets** — `JWT_SECRET` and `SQLITE_WEB_PASSWORD` must be set before deployment; both accept output from `openssl rand`
+- **Default credentials** — change `admin` / `admin123` immediately after first login
+- **API keys** — stored bcrypt-hashed in SQLite, accessible only inside the Docker volume
+- **Passwords** — bcrypt-hashed (cost 10), never stored in plaintext
+- **JWT sessions** — expire after 8 hours; set a strong `JWT_SECRET` (32+ random bytes)
 - **Rate limiting** — 100 requests/minute/IP on all non-health endpoints
-- `sessions/` is git-ignored — never commit session files
-- In production: firewall port `3001` (admin UI) to internal network only
+- **SQLite Web** — exposed on port 3002; protect with a strong `SQLITE_WEB_PASSWORD` and firewall the port to internal network only in production
+- **sessions/** — git-ignored; never commit Baileys session files
+- **Production** — firewall ports `3001` (admin UI) and `3002` (database browser) to your internal network; only port `3000` (API) needs to be reachable by external systems
 
 ---
 
