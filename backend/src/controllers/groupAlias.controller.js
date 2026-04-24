@@ -12,10 +12,10 @@ export async function listGroupAliasesController(req, res) {
 export async function setGroupAliasController(req, res) {
   const { alias, jid, label } = req.body;
   if (!alias || typeof alias !== 'string' || !alias.trim()) {
-    return res.status(400).json({ error: '`alias` wajib diisi' });
+    return res.status(400).json({ error: '`alias` is required' });
   }
   if (!jid || typeof jid !== 'string' || !jid.trim()) {
-    return res.status(400).json({ error: '`jid` wajib diisi' });
+    return res.status(400).json({ error: '`jid` is required' });
   }
   try {
     const result = await setAlias(alias.trim(), jid.trim(), label?.trim() ?? '');

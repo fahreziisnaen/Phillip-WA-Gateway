@@ -51,7 +51,7 @@ export default function Settings() {
           <SettingsIcon className="w-6 h-6 text-gray-500" />
           Settings
         </h1>
-        <p className="text-sm text-gray-500 mt-0.5">Manage API keys and dashboard users</p>
+        <p className="text-sm text-gray-500 mt-0.5">Manage API keys, users, and access control</p>
       </div>
 
       {/* Tabs */}
@@ -490,7 +490,7 @@ function GroupAliasesTab() {
       const res = await fetchGroupAliases();
       setAliases(res.data);
     } catch (err) {
-      showFlash('error', err.response?.data?.error ?? 'Gagal memuat group aliases');
+      showFlash('error', err.response?.data?.error ?? 'Failed to load group aliases');
     } finally {
       setLoading(false);
     }
@@ -509,24 +509,24 @@ function GroupAliasesTab() {
     setSaving(true);
     try {
       await setGroupAlias(form.alias.trim(), form.jid.trim(), form.label.trim());
-      showFlash('success', `Alias "${form.alias.trim()}" berhasil disimpan`);
+      showFlash('success', `Alias "${form.alias.trim()}" saved successfully`);
       setForm({ alias: '', jid: '', label: '' });
       await load();
     } catch (err) {
-      showFlash('error', err.response?.data?.error ?? 'Gagal menyimpan alias');
+      showFlash('error', err.response?.data?.error ?? 'Failed to save alias');
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(alias) {
-    if (!window.confirm(`Hapus alias "${alias}"?`)) return;
+    if (!window.confirm(`Delete alias "${alias}"?`)) return;
     try {
       await deleteGroupAlias(alias);
-      showFlash('success', `Alias "${alias}" dihapus`);
+      showFlash('success', `Alias "${alias}" deleted`);
       await load();
     } catch (err) {
-      showFlash('error', err.response?.data?.error ?? 'Gagal menghapus alias');
+      showFlash('error', err.response?.data?.error ?? 'Failed to delete alias');
     }
   }
 
@@ -542,30 +542,30 @@ function GroupAliasesTab() {
 
       {/* Info */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-700">
-        <p className="font-semibold mb-1">Apa itu Group Alias?</p>
+        <p className="font-semibold mb-1">What is a Group Alias?</p>
         <p className="text-xs text-blue-600">
-          Alias memungkinkan client mengirim pesan ke grup WhatsApp menggunakan nama pendek
-          (misalnya <code className="bg-blue-100 px-1 rounded font-mono">alert-it</code>) tanpa
-          perlu mengetahui Group ID panjang (<code className="bg-blue-100 px-1 rounded font-mono">120363...@g.us</code>).
-          Gunakan nama alias sebagai nilai field <code className="bg-blue-100 px-1 rounded font-mono">id</code> saat POST ke{' '}
+          Aliases allow clients to send messages to WhatsApp groups using a short name
+          (e.g. <code className="bg-blue-100 px-1 rounded font-mono">alert-it</code>) without
+          needing to know the long Group ID (<code className="bg-blue-100 px-1 rounded font-mono">120363...@g.us</code>).
+          Use the alias name as the <code className="bg-blue-100 px-1 rounded font-mono">id</code> field value when POSTing to{' '}
           <code className="bg-blue-100 px-1 rounded font-mono">/send-message</code>.
         </p>
       </div>
 
-      {/* Form tambah/update alias */}
+      {/* Add/update alias form */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-gray-800 mb-3">Tambah / Update Alias</h2>
+        <h2 className="text-sm font-semibold text-gray-800 mb-3">Add / Update Alias</h2>
         <form onSubmit={handleSave} className="space-y-3">
           <div className="flex gap-2 flex-wrap">
             <div className="flex-1 min-w-36">
-              <label className="block text-xs text-gray-500 mb-1">Nama Alias <span className="text-red-400">*</span></label>
+              <label className="block text-xs text-gray-500 mb-1">Alias Name <span className="text-red-400">*</span></label>
               <input
                 type="text"
-                placeholder="misal: alert-it"
+                placeholder="e.g. alert-it"
                 value={form.alias}
                 onChange={(e) => setForm({ ...form, alias: e.target.value })}
                 pattern="[a-zA-Z0-9_\-]+"
-                title="Hanya huruf, angka, underscore, dan tanda hubung"
+                title="Only letters, numbers, underscores, and hyphens"
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition font-mono"
                 required
               />
@@ -584,10 +584,10 @@ function GroupAliasesTab() {
           </div>
           <div className="flex gap-2 items-end">
             <div className="flex-1">
-              <label className="block text-xs text-gray-500 mb-1">Label (opsional)</label>
+              <label className="block text-xs text-gray-500 mb-1">Label (optional)</label>
               <input
                 type="text"
-                placeholder="Keterangan nama grup"
+                placeholder="Group description"
                 value={form.label}
                 onChange={(e) => setForm({ ...form, label: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
@@ -599,12 +599,12 @@ function GroupAliasesTab() {
               className="flex items-center gap-1.5 px-4 py-2 bg-wa-green hover:bg-wa-teal disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors shadow-sm whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
-              {saving ? 'Menyimpan…' : 'Simpan Alias'}
+              {saving ? 'Saving…' : 'Save Alias'}
             </button>
           </div>
           <p className="text-xs text-gray-400">
-            Jika alias sudah ada, data akan di-update. Salin Group JID dari halaman{' '}
-            <a href="/groups" className="text-wa-teal underline">Groups</a>.
+            If the alias already exists, it will be updated. Copy Group JID from the{' '}
+            <a href="/groups" className="text-wa-teal underline">Groups</a> page.
           </p>
         </form>
       </div>
@@ -613,7 +613,7 @@ function GroupAliasesTab() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-800">
-            Daftar Alias
+            Alias List
             {aliases.length > 0 && (
               <span className="ml-2 text-xs font-normal text-gray-400">({aliases.length})</span>
             )}
@@ -625,7 +625,7 @@ function GroupAliasesTab() {
 
         {!loading && aliases.length === 0 && (
           <div className="text-center py-10 text-gray-400 text-sm">
-            Belum ada alias. Tambahkan di atas.
+            No aliases yet. Add one above.
           </div>
         )}
 
@@ -664,7 +664,7 @@ function GroupAliasesTab() {
                   </button>
                   <button
                     onClick={() => handleDelete(a.alias)}
-                    title="Hapus alias"
+                    title="Delete alias"
                     className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -694,7 +694,7 @@ function AllowedIpsTab() {
       const res = await fetchAllowedIps();
       setIps(res.data);
     } catch (err) {
-      showFlash('error', err.response?.data?.error ?? 'Gagal memuat daftar IP');
+      showFlash('error', err.response?.data?.error ?? 'Failed to load IP list');
     } finally {
       setLoading(false);
     }
@@ -713,24 +713,24 @@ function AllowedIpsTab() {
     setSaving(true);
     try {
       await addAllowedIp(form.ip.trim(), form.label.trim());
-      showFlash('success', `IP "${form.ip.trim()}" berhasil ditambahkan`);
+      showFlash('success', `IP "${form.ip.trim()}" added successfully`);
       setForm({ ip: '', label: '' });
       await load();
     } catch (err) {
-      showFlash('error', err.response?.data?.error ?? 'Gagal menambahkan IP');
+      showFlash('error', err.response?.data?.error ?? 'Failed to add IP');
     } finally {
       setSaving(false);
     }
   }
 
   async function handleRemove(ip) {
-    if (!window.confirm(`Hapus IP "${ip}" dari whitelist?`)) return;
+    if (!window.confirm(`Remove IP "${ip}" from whitelist?`)) return;
     try {
       await removeAllowedIp(ip);
-      showFlash('success', `IP "${ip}" dihapus`);
+      showFlash('success', `IP "${ip}" removed`);
       await load();
     } catch (err) {
-      showFlash('error', err.response?.data?.error ?? 'Gagal menghapus IP');
+      showFlash('error', err.response?.data?.error ?? 'Failed to remove IP');
     }
   }
 
@@ -740,24 +740,24 @@ function AllowedIpsTab() {
 
       {/* Info */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-700">
-        <p className="font-semibold mb-1">IP Whitelist — Akses Tanpa API Key</p>
+        <p className="font-semibold mb-1">IP Whitelist — Access Without API Key</p>
         <p className="text-xs text-blue-600 leading-relaxed">
-          Request dari IP yang di-whitelist akan otomatis diizinkan <strong>tanpa perlu API key</strong>.
-          Cocok untuk sistem seperti <strong>PRTG</strong> yang tidak bisa mengirim custom header.
-          Mendukung format: IP tunggal (<code className="bg-blue-100 px-1 rounded font-mono">192.168.1.100</code>),
+          Requests from whitelisted IPs are automatically allowed <strong>without an API key</strong>.
+          Ideal for systems like <strong>PRTG</strong> that cannot send custom headers.
+          Supported formats: single IP (<code className="bg-blue-100 px-1 rounded font-mono">192.168.1.100</code>),
           CIDR (<code className="bg-blue-100 px-1 rounded font-mono">10.0.0.0/24</code>),
-          atau wildcard (<code className="bg-blue-100 px-1 rounded font-mono">172.16.*.*</code>).
+          or wildcard (<code className="bg-blue-100 px-1 rounded font-mono">172.16.*.*</code>).
         </p>
       </div>
 
       {/* Add form */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-gray-800 mb-3">Tambah IP ke Whitelist</h2>
+        <h2 className="text-sm font-semibold text-gray-800 mb-3">Add IP to Whitelist</h2>
         <form onSubmit={handleAdd} className="flex gap-2 flex-wrap">
           <div className="flex-1 min-w-44">
             <input
               type="text"
-              placeholder="IP address, CIDR, atau wildcard"
+              placeholder="IP address, CIDR, or wildcard"
               value={form.ip}
               onChange={(e) => setForm({ ...form, ip: e.target.value })}
               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
@@ -779,7 +779,7 @@ function AllowedIpsTab() {
             className="flex items-center gap-1.5 px-4 py-2 bg-wa-green hover:bg-wa-teal disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors shadow-sm whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            {saving ? 'Menambahkan…' : 'Tambah'}
+            {saving ? 'Adding…' : 'Add'}
           </button>
         </form>
       </div>
@@ -788,7 +788,7 @@ function AllowedIpsTab() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-800">
-            Daftar Allowed IPs
+            Allowed IPs
             {ips.length > 0 && (
               <span className="ml-2 text-xs font-normal text-gray-400">({ips.length})</span>
             )}
@@ -800,7 +800,7 @@ function AllowedIpsTab() {
 
         {!loading && ips.length === 0 && (
           <div className="text-center py-10 text-gray-400 text-sm">
-            Belum ada IP di whitelist. Semua request wajib pakai API key.
+            No IPs whitelisted yet. All requests require an API key.
           </div>
         )}
 
@@ -817,7 +817,7 @@ function AllowedIpsTab() {
                     <span className="ml-2 text-xs text-gray-400">— {entry.label}</span>
                   )}
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Ditambahkan {new Date(entry.createdAt).toLocaleDateString()}
+                    Added {new Date(entry.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <button
@@ -825,7 +825,7 @@ function AllowedIpsTab() {
                   className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  Hapus
+                  Remove
                 </button>
               </li>
             ))}
@@ -837,8 +837,8 @@ function AllowedIpsTab() {
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
         <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-amber-700 leading-relaxed">
-          <strong>Hati-hati:</strong> IP yang di-whitelist bisa mengirim pesan tanpa autentikasi.
-          Pastikan hanya memasukkan IP server internal yang terpercaya (seperti PRTG, SolarWinds, Zabbix).
+          <strong>Caution:</strong> Whitelisted IPs can send messages without authentication.
+          Only add trusted internal server IPs (such as PRTG, SolarWinds, Zabbix).
         </p>
       </div>
     </div>

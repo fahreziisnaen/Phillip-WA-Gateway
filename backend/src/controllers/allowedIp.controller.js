@@ -12,7 +12,7 @@ export async function listAllowedIpsController(req, res) {
 export async function addAllowedIpController(req, res) {
   const { ip, label } = req.body;
   if (!ip || typeof ip !== 'string' || !ip.trim()) {
-    return res.status(400).json({ error: '`ip` wajib diisi' });
+    return res.status(400).json({ error: '`ip` is required' });
   }
   try {
     const entry = await addAllowedIp(ip.trim(), label?.trim() ?? '');

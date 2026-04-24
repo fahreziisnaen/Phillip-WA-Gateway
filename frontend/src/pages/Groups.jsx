@@ -134,8 +134,8 @@ export default function Groups() {
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-2.5">
         <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-blue-700">
-          Copy Group ID atau klik <strong>Set Alias</strong> untuk membuat nama pendek yang bisa dipakai
-          sebagai <code className="bg-blue-100 px-1 rounded text-xs">id</code> di{' '}
+          Copy the Group ID or click <strong>Set Alias</strong> to create a short name that can be used
+          as the <code className="bg-blue-100 px-1 rounded text-xs">id</code> field in{' '}
           <code className="bg-blue-100 px-1 rounded text-xs">POST /send-message</code>.
         </p>
       </div>
@@ -234,7 +234,7 @@ function AliasModal({ group, onClose }) {
       setSuccess(true);
       setTimeout(onClose, 1200);
     } catch (err) {
-      setError(err.response?.data?.error ?? 'Gagal menyimpan alias');
+      setError(err.response?.data?.error ?? 'Failed to save alias');
     } finally {
       setSaving(false);
     }
@@ -262,31 +262,31 @@ function AliasModal({ group, onClose }) {
         {success ? (
           <div className="flex items-center gap-2 text-green-600 py-2">
             <Check className="w-4 h-4" />
-            <span className="text-sm font-medium">Alias berhasil disimpan!</span>
+            <span className="text-sm font-medium">Alias saved successfully!</span>
           </div>
         ) : (
           <form onSubmit={handleSave} className="space-y-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">
-                Nama Alias <span className="text-red-400">*</span>
+                Alias Name <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
-                placeholder="misal: alert-it"
+                placeholder="e.g. alert-it"
                 value={alias}
                 onChange={(e) => setAlias(e.target.value)}
                 pattern="[a-zA-Z0-9_\-]+"
-                title="Hanya huruf, angka, underscore, dan tanda hubung"
+                title="Only letters, numbers, underscores, and hyphens"
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
                 autoFocus
                 required
               />
               <p className="text-xs text-gray-400 mt-1">
-                Alias ini yang akan dipakai sebagai <code className="bg-gray-100 px-1 rounded">id</code> saat POST.
+                This alias will be used as the <code className="bg-gray-100 px-1 rounded">id</code> field when POSTing.
               </p>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Label (opsional)</label>
+              <label className="block text-xs text-gray-500 mb-1">Label (optional)</label>
               <input
                 type="text"
                 value={label}
@@ -305,7 +305,7 @@ function AliasModal({ group, onClose }) {
                 onClick={onClose}
                 className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
               >
-                Batal
+                Cancel
               </button>
               <button
                 type="submit"
@@ -313,7 +313,7 @@ function AliasModal({ group, onClose }) {
                 className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-wa-green hover:bg-wa-teal disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                {saving ? 'Menyimpan…' : 'Simpan'}
+                {saving ? 'Saving…' : 'Save'}
               </button>
             </div>
           </form>

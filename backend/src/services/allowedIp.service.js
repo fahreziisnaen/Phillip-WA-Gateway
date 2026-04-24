@@ -86,7 +86,7 @@ function ipToInt(ip) {
  */
 export async function addAllowedIp(ip, label = '') {
   if (!ip || typeof ip !== 'string' || !ip.trim()) {
-    throw new Error('IP address wajib diisi');
+    throw new Error('IP address is required');
   }
 
   const all = await read();
@@ -94,7 +94,7 @@ export async function addAllowedIp(ip, label = '') {
 
   // Check duplicate
   if (all.some((e) => e.ip === normalized)) {
-    throw new Error(`IP "${normalized}" sudah ada di whitelist`);
+    throw new Error(`IP "${normalized}" is already in the whitelist`);
   }
 
   const entry = {
@@ -112,7 +112,7 @@ export async function removeAllowedIp(ip) {
   const normalized = ip.trim();
   const filtered = all.filter((e) => e.ip !== normalized);
   if (filtered.length === all.length) {
-    throw new Error(`IP "${normalized}" tidak ditemukan di whitelist`);
+    throw new Error(`IP "${normalized}" not found in whitelist`);
   }
   await write(filtered);
 }

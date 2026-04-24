@@ -32,10 +32,10 @@ export async function resolveAlias(alias) {
  */
 export async function setAlias(alias, jid, label = '') {
   if (!/^[a-z0-9_-]+$/i.test(alias)) {
-    throw new Error('Alias hanya boleh huruf, angka, underscore, dan tanda hubung');
+    throw new Error('Alias may only contain letters, numbers, underscores, and hyphens');
   }
   if (!jid.endsWith('@g.us')) {
-    throw new Error('JID harus berupa group JID yang diakhiri dengan @g.us');
+    throw new Error('JID must be a group JID ending with @g.us');
   }
 
   const all = await read();
@@ -61,6 +61,6 @@ export async function deleteAlias(alias) {
   const all = await read();
   const key = alias.toLowerCase();
   const filtered = all.filter((a) => a.alias.toLowerCase() !== key);
-  if (filtered.length === all.length) throw new Error(`Alias "${alias}" tidak ditemukan`);
+  if (filtered.length === all.length) throw new Error(`Alias "${alias}" not found`);
   await write(filtered);
 }

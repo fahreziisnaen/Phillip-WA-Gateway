@@ -111,7 +111,7 @@ function ApiDocs({ instances = [] }) {
   const [expanded, setExpanded] = useState(true);
   const exampleInstance = instances.find((i) => i.status === 'connected')?.id ?? 'wa1';
 
-  // ── Contoh kirim ke nomor personal ──
+  // ── Example: send to personal number ──
   const jsonExample = `{
   "id": "628123456789",
   "message": "Hello World!",
@@ -120,7 +120,7 @@ function ApiDocs({ instances = [] }) {
 
   const formExample = `id=628123456789&message=Hello%20World!&from=${exampleInstance}`;
 
-  // ── Contoh kirim ke group via alias ──
+  // ── Example: send to group via alias ──
   const jsonAliasExample = `{
   "id": "alert-it",
   "message": "Server down!",
@@ -192,7 +192,7 @@ curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
   'from'    => '${exampleInstance}',
 ]));
 // Content-Type: application/x-www-form-urlencoded
-// dikirim otomatis oleh cURL saat POSTFIELDS berupa string
+// is automatically sent by cURL when POSTFIELDS is a string
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 $response = curl_exec($ch);`;
 
@@ -220,7 +220,7 @@ $response = curl_exec($ch);`;
           <div className="px-5 py-4 bg-amber-50 border-b border-amber-100">
             <p className="text-xs font-semibold text-amber-800 mb-2">Authentication</p>
             <p className="text-xs text-amber-700 mb-3">
-              Gunakan salah satu metode berikut (diproses berurutan):
+              Use one of the following methods (checked in order):
             </p>
             <div className="space-y-2.5">
               {/* Method 1 - IP Whitelist */}
@@ -228,11 +228,11 @@ $response = curl_exec($ch);`;
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded">1</span>
                   <span className="text-xs font-semibold text-amber-900">IP Whitelist</span>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">tanpa API key</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">no API key needed</span>
                 </div>
                 <p className="text-[11px] text-amber-700 leading-relaxed">
-                  Jika IP pengirim sudah di-whitelist, request langsung diizinkan tanpa API key.
-                  Ideal untuk <strong>PRTG</strong>, Zabbix, atau sistem yang tidak bisa set custom header.
+                  If the sender IP is whitelisted, the request is allowed without an API key.
+                  Ideal for <strong>PRTG</strong>, Zabbix, or systems that cannot set custom headers.
                 </p>
               </div>
               {/* Methods 2-3 - Headers */}
@@ -254,7 +254,7 @@ $response = curl_exec($ch);`;
                   <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">form-urlencoded</span>
                 </div>
                 <p className="text-[11px] text-amber-700 mb-1">
-                  Tambahkan field <code className="bg-amber-100 px-1 rounded font-mono">apikey</code> di body request:
+                  Include the <code className="bg-amber-100 px-1 rounded font-mono">apikey</code> field in the request body:
                 </p>
                 <CodeLine label="Body" code="apikey=YOUR_API_KEY&id=628...&message=Hello" />
               </div>
@@ -268,8 +268,8 @@ $response = curl_exec($ch);`;
               </div>
             </div>
             <p className="text-xs text-amber-600 mt-3">
-              API key dikelola di <Link to="/settings" className="underline font-medium">Settings → API Keys</Link>.
-              IP whitelist di <Link to="/settings" className="underline font-medium">Settings → Allowed IPs</Link>.
+              Manage API keys in <Link to="/settings" className="underline font-medium">Settings → API Keys</Link>.
+              Manage IP whitelist in <Link to="/settings" className="underline font-medium">Settings → Allowed IPs</Link>.
             </p>
           </div>
 
@@ -277,10 +277,10 @@ $response = curl_exec($ch);`;
           <div className="px-5 py-4 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-700 mb-3">Body Fields</p>
             <div className="space-y-2">
-              <FieldRow name="id" type="string" required desc='Nomor WhatsApp (e.g. "628123456789"), Group JID (e.g. "120363...@g.us"), atau Group Alias (e.g. "alert-it"). Alias dibuat di Settings → Group Aliases.' />
-              <FieldRow name="message" type="string" required desc="Isi pesan yang akan dikirim." />
-              <FieldRow name="from" type="string" required={false} desc={`Instance ID yang digunakan untuk mengirim. Jika kosong, pakai instance pertama yang connected.`} />
-              <FieldRow name="apikey" type="string" required={false} desc='API key (alternatif jika tidak bisa set header). Bisa juga dikirim via query param ?apikey=xxx. Tidak perlu jika IP sudah di-whitelist.' />
+              <FieldRow name="id" type="string" required desc='WhatsApp number (e.g. "628123456789"), Group JID (e.g. "120363...@g.us"), or Group Alias (e.g. "alert-it"). Aliases are managed in Settings → Group Aliases.' />
+              <FieldRow name="message" type="string" required desc="The message content to send." />
+              <FieldRow name="from" type="string" required={false} desc={`Instance ID to send from. If omitted, the first connected instance is used.`} />
+              <FieldRow name="apikey" type="string" required={false} desc='API key (alternative if headers cannot be set). Can also be sent via query param ?apikey=xxx. Not required if the IP is whitelisted.' />
             </div>
           </div>
 
@@ -291,21 +291,21 @@ $response = curl_exec($ch);`;
               Group Alias
             </p>
             <p className="text-xs text-emerald-700 leading-relaxed">
-              Daripada menggunakan Group JID yang panjang, Anda bisa membuat <strong>alias pendek</strong> untuk setiap grup.
-              Cukup gunakan nama alias (misalnya <code className="bg-emerald-100 px-1 rounded font-mono">alert-it</code>) sebagai
-              nilai field <code className="bg-emerald-100 px-1 rounded font-mono">id</code>. Server akan otomatis me-resolve alias
-              ke Group JID yang sesuai.
+              Instead of using long Group JIDs, you can create <strong>short aliases</strong> for each group.
+              Simply use the alias name (e.g. <code className="bg-emerald-100 px-1 rounded font-mono">alert-it</code>) as the
+              <code className="bg-emerald-100 px-1 rounded font-mono">id</code> field value. The server will automatically resolve the alias
+              to the corresponding Group JID.
             </p>
             <p className="text-xs text-emerald-600 mt-1.5">
-              Kelola alias di <Link to="/settings" className="underline font-medium">Settings → Group Aliases</Link> atau
-              langsung dari halaman <Link to="/groups" className="underline font-medium">Groups</Link> (tombol Set Alias).
+              Manage aliases in <Link to="/settings" className="underline font-medium">Settings → Group Aliases</Link> or
+              directly from the <Link to="/groups" className="underline font-medium">Groups</Link> page (Set Alias button).
             </p>
           </div>
 
           {/* Format tabs */}
           <div className="px-5 pt-4 pb-2 border-b border-gray-100">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-gray-700">Contoh Request</p>
+              <p className="text-xs font-semibold text-gray-700">Request Examples</p>
               <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
                 <button
                   onClick={() => setFormat('json')}
@@ -333,20 +333,20 @@ $response = curl_exec($ch);`;
             {/* Format explanation */}
             {format === 'json' ? (
               <div className="mb-3 text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                Set header <code className="bg-blue-100 px-1 rounded font-mono">Content-Type: application/json</code> dan kirim body sebagai objek JSON.
+                Set the <code className="bg-blue-100 px-1 rounded font-mono">Content-Type: application/json</code> header and send the body as a JSON object.
               </div>
             ) : (
               <div className="mb-3 text-xs text-gray-500 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
-                Set header <code className="bg-purple-100 px-1 rounded font-mono">Content-Type: application/x-www-form-urlencoded</code> dan kirim body sebagai key=value yang di-encode (sama seperti form HTML biasa).
+                Set the <code className="bg-purple-100 px-1 rounded font-mono">Content-Type: application/x-www-form-urlencoded</code> header and send the body as URL-encoded key=value pairs (same as a standard HTML form).
               </div>
             )}
 
             {/* Raw body preview — personal number */}
-            <p className="text-[11px] text-gray-400 font-medium mb-1">Raw Body — Kirim ke Nomor</p>
+            <p className="text-[11px] text-gray-400 font-medium mb-1">Raw Body — Send to Number</p>
             <CodeBlock code={format === 'json' ? jsonExample : formExample} />
 
             {/* Raw body preview — group alias */}
-            <p className="text-[11px] text-emerald-500 font-medium mt-3 mb-1">Raw Body — Kirim ke Group (via Alias)</p>
+            <p className="text-[11px] text-emerald-500 font-medium mt-3 mb-1">Raw Body — Send to Group (via Alias)</p>
             <CodeBlock code={format === 'json' ? jsonAliasExample : formAliasExample} />
 
             {/* cURL */}
@@ -364,21 +364,21 @@ $response = curl_exec($ch);`;
             {/* PRTG example */}
             {format === 'form' && (
               <div className="mt-4 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5">
-                <p className="text-[11px] font-semibold text-orange-800 mb-1">💡 Contoh untuk PRTG HTTP Push / Notification</p>
+                <p className="text-[11px] font-semibold text-orange-800 mb-1">💡 Example for PRTG HTTP Push / Notification</p>
                 <p className="text-[11px] text-orange-700 mb-2 leading-relaxed">
-                  PRTG tidak bisa set custom header. Gunakan salah satu cara:
+                  PRTG cannot set custom headers. Use one of the following methods:
                 </p>
                 <div className="space-y-2">
                   <div>
-                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Opsi A: IP Whitelist (tanpa API key)</p>
+                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Option A: IP Whitelist (no API key)</p>
                     <CodeBlock code={`id=alert-it&message=[%sitename] %device %sensor %status`} />
                   </div>
                   <div>
-                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Opsi B: API key di body</p>
+                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Option B: API key in body</p>
                     <CodeBlock code={`apikey=YOUR_API_KEY&id=alert-it&message=[%sitename] %device %sensor %status`} />
                   </div>
                   <div>
-                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Opsi C: API key di URL query</p>
+                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Option C: API key in URL query</p>
                     <CodeBlock code={`URL: https://yourdomain.com/send-message?apikey=YOUR_API_KEY
 Body: id=alert-it&message=[%sitename] %device %sensor %status`} />
                   </div>
@@ -389,7 +389,7 @@ Body: id=alert-it&message=[%sitename] %device %sensor %status`} />
 
           {/* Response */}
           <div className="px-5 py-4">
-            <p className="text-xs font-semibold text-gray-700 mb-3">Contoh Response</p>
+            <p className="text-xs font-semibold text-gray-700 mb-3">Response Examples</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[11px] text-green-600 font-medium mb-1">202 Accepted</p>
