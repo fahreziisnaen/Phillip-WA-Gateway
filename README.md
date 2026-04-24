@@ -1,20 +1,20 @@
-# WhatsApp Gateway
+# Phillip WA Gateway
 
-A production-ready middleware that lets external systems (monitoring tools, alert platforms, automation scripts) send WhatsApp messages via a simple HTTP API.
+WhatsApp Gateway middleware for **Phillip Securities Hong Kong** — lets external systems (monitoring tools, alert platforms, automation scripts) send WhatsApp messages via a simple HTTP API.
 
-**Stack:** Node.js · Baileys · Express · BullMQ · Redis · React · Vite · TailwindCSS · nginx · Docker
+**Stack:** Node.js · Baileys · Express · BullMQ · Redis · SQLite · React · Vite · TailwindCSS · nginx · Docker
 
 ---
 
 ## Architecture
 
 ```
-External System (SolarWinds, etc.)
+External System (SolarWinds, PRTG, etc.)
       │  POST /send-message
       │  Authorization: Bearer <api-key>
       ▼
   Backend :3000 (Express)
-      │  Auth middleware  → validates API key
+      │  Auth middleware  → validates API key / IP whitelist
       │  ID normalizer   → converts to WhatsApp JID
       │  getRecipientName → resolves display name
       ▼
@@ -28,10 +28,16 @@ External System (SolarWinds, etc.)
   WhatsApp Group / Personal
 
   ─────────────────────────────────────────────────────
+  SQLite Database (gateway.db)
+      │  users, API keys, instances, group aliases,
+      │  allowed IPs, message logs
+      └  persisted via Docker named volume (db_data)
+
+  ─────────────────────────────────────────────────────
   Admin Dashboard :3001 (React + nginx)
       │  nginx proxies /api/*      → backend:3000
       │  nginx proxies /socket.io/ → backend:3000 (WebSocket)
-      └  real-time status via Socket.IO `instance_status` event
+      └  real-time status via Socket.IO events
 ```
 
 ---
@@ -41,7 +47,7 @@ External System (SolarWinds, etc.)
 ```bash
 # 1. Copy and configure environment
 cp .env.example .env
-# Edit .env — at minimum set API_KEY and JWT_SECRET:
+# Edit .env — set JWT_SECRET:
 #   openssl rand -hex 32
 
 # 2. Build and launch all services
@@ -60,11 +66,10 @@ Default login: `admin` / `admin123` — **change this immediately** via Settings
 ## First-Time Setup
 
 1. Log in at **http://localhost:3001**
-2. Go to **Instances** — the default instance `wa1` is already created
-3. Click the **QR** button (or **Add Instance** for a new one) — a QR code modal opens automatically
-4. Scan the QR with WhatsApp on your phone (Settings → Linked Devices → Link a Device)
-5. Once connected, go to **Groups** to find and copy your group IDs
-6. Go to **Settings → API Keys** → generate a key for SolarWinds or any external system
+2. Go to **Instances** → click **Add Instance**
+3. Scan the QR code that appears automatically with WhatsApp on your phone (Settings → Linked Devices → Link a Device)
+4. Once connected, go to **Groups** to find and copy your group IDs
+5. Go to **Settings → API Keys** → generate a key for SolarWinds or any external system
 
 ---
 
@@ -76,8 +81,8 @@ Default login: `admin` / `admin123` — **change this immediately** via Settings
 
 ```bash
 cd backend
-# Create a local .env manually (copy values from root .env.example, set REDIS_HOST=localhost)
 npm install
+# Create .env (copy from root .env.example, set REDIS_HOST=localhost)
 npm run dev
 # → http://localhost:3000
 ```
@@ -106,11 +111,11 @@ The Vite dev server proxies `/api/*` and `/socket.io/*` to `http://localhost:300
 | `/health`, `/status`, `/auth/login` | None |
 
 For `POST /send-message`, authentication is checked in the following order:
-1. **IP Whitelist**: No API key needed if the sender IP is whitelisted (supports single IP, CIDR, wildcard).
-2. **HTTP Header**: `Authorization: Bearer <key>`
-3. **HTTP Header**: `x-api-key: <key>`
-4. **Body Field**: `apikey=<key>` (especially useful for `application/x-www-form-urlencoded`)
-5. **Query Parameter**: `?apikey=<key>`
+
+1. **IP Whitelist** — no API key needed if the sender IP is whitelisted (supports single IP, CIDR, wildcard)
+2. **HTTP Header** — `Authorization: Bearer <key>`
+3. **HTTP Header** — `x-api-key: <key>`
+4. **Body Field** — `apikey=<key>` (useful for `application/x-www-form-urlencoded` or systems that cannot set headers)
 
 > **Rate limiting:** All endpoints (except `/health`) are limited to **100 requests per minute per IP**.
 
@@ -189,7 +194,7 @@ id=alert-it&message=Hello%20World&apikey=YOUR_API_KEY
 | `message` | Yes | Text to send. Supports WhatsApp markdown: `*bold*`, `_italic_`, `~strikethrough~` |
 | `id` | Yes | Recipient — see accepted formats below |
 | `from` | No | Instance ID to send from (e.g. `wa1`). Defaults to the first connected instance. |
-| `apikey` | No | API key (fallback if headers cannot be used, e.g. from PRTG). |
+| `apikey` | No | API key (alternative if headers cannot be set). Not required if the IP is whitelisted. |
 
 **Accepted `id` formats:**
 
@@ -251,7 +256,7 @@ id=alert-it&message=Hello%20World&apikey=YOUR_API_KEY
 { "id": "wa2", "name": "WhatsApp 2" }
 ```
 
-> `id` must only contain letters, numbers, `_`, or `-`. It is stored in lowercase.
+> `id` must only contain letters, numbers, `_`, or `-`.
 
 **Response (201):**
 ```json
@@ -262,23 +267,17 @@ After creation, the instance starts connecting and a QR code becomes available i
 
 ---
 
-### `GET /instances/:id/status` — JWT required
-
-Returns the same shape as a single element from `GET /instances`.
-
----
-
 ### `GET /instances/:id/qr` — JWT required
 
-Returns QR code while the instance is waiting to be scanned. Refreshes every ~20 seconds by Baileys.
+Returns QR code while the instance is waiting to be scanned.
 
 ```json
 { "qr": "data:image/png;base64,..." }
 ```
 
-Returns `404` if the instance is already connected, or if QR hasn't been generated yet.
+Returns `404` if the instance is already connected or QR hasn't been generated yet.
 
-> The admin dashboard polls this endpoint every **3 seconds** and shows an updated QR image in real time.
+> The admin dashboard also receives QR updates in real time via the `instance_status` Socket.IO event — no polling required.
 
 ---
 
@@ -294,8 +293,6 @@ Disconnects the instance, wipes all session files, and triggers a new QR code.
 
 ### `DELETE /instances/:id` — JWT required
 
-Permanently removes the instance and deletes its session directory.
-
 ```json
 { "success": true }
 ```
@@ -303,8 +300,6 @@ Permanently removes the instance and deletes its session directory.
 ---
 
 ### `GET /instances/:id/groups` — JWT required
-
-Returns all WhatsApp groups the instance is a member of. Order depends on WhatsApp's response (the admin UI sorts them alphabetically client-side).
 
 ```json
 [
@@ -315,27 +310,30 @@ Returns all WhatsApp groups the instance is a member of. Order depends on WhatsA
 
 ---
 
-### `GET /logs?limit=100` — JWT required
+### `GET /logs` — JWT required
 
-Returns the most recent log entries in reverse chronological order (newest first). Maximum `limit` is 1000.
+Query params: `limit` (default 2000, max 5000), `from` (YYYY-MM-DD), `to` (YYYY-MM-DD)
 
 ```json
-[
-  {
-    "timestamp": "2026-04-13T10:00:00.000Z",
-    "sourceIp": "192.168.1.10",
-    "instanceId": "wa1",
-    "instancePhone": "628111000111",
-    "id": "120363025600132873@g.us",
-    "recipientName": "Network Team",
-    "message": "Device Down Alert",
-    "status": "success",
-    "error": null
-  }
-]
+{
+  "logs": [
+    {
+      "timestamp": "2026-04-13T10:00:00.000Z",
+      "sourceIp": "192.168.1.10",
+      "instanceId": "wa1",
+      "instancePhone": "628111000111",
+      "id": "120363025600132873@g.us",
+      "recipientName": "Network Team",
+      "message": "Device Down Alert",
+      "status": "success",
+      "error": null
+    }
+  ],
+  "stats": { "total": 120, "success": 118, "failed": 2 }
+}
 ```
 
-`status` values: `"success"` | `"failed"`. On failure, `error` contains the error message.
+Logs are retained for **90 days**. Older entries are cleaned up automatically on startup and daily.
 
 ---
 
@@ -343,12 +341,7 @@ Returns the most recent log entries in reverse chronological order (newest first
 
 ```json
 [
-  {
-    "id": "a1b2c3d4",
-    "username": "admin",
-    "role": "admin",
-    "createdAt": "2026-04-13T08:00:00.000Z"
-  }
+  { "id": "a1b2c3d4", "username": "admin", "role": "admin", "createdAt": "2026-04-13T08:00:00.000Z" }
 ]
 ```
 
@@ -358,28 +351,16 @@ Password hashes are never returned.
 
 ### `POST /admin/users` — JWT required
 
-**Request:**
-```json
-{ "username": "ops", "password": "securepassword" }
-```
-
+**Request:** `{ "username": "ops", "password": "securepassword" }`
 > Password must be at least **6 characters**.
 
-**Response (201):**
-```json
-{ "id": "e5f6g7h8", "username": "ops", "role": "admin", "createdAt": "2026-04-13T09:00:00.000Z" }
-```
+**Response (201):** `{ "id": "e5f6g7h8", "username": "ops", "role": "admin", "createdAt": "..." }`
 
 ---
 
 ### `PUT /admin/users/:id/password` — JWT required
 
-**Request:**
-```json
-{ "password": "newpassword" }
-```
-
-**Response:** `{ "success": true }`
+**Request:** `{ "password": "newpassword" }` → **Response:** `{ "success": true }`
 
 ---
 
@@ -387,7 +368,7 @@ Password hashes are never returned.
 
 `{ "success": true }`
 
-> Cannot delete your own account. Cannot delete the last remaining user.
+> Cannot delete your own account or the last remaining user.
 
 ---
 
@@ -411,12 +392,9 @@ Key values are masked — only the first 8 and last 4 characters visible.
 
 ### `POST /admin/apikeys` — JWT required
 
-**Request:**
-```json
-{ "name": "SolarWinds Prod" }
-```
+**Request:** `{ "name": "SolarWinds Prod" }`
 
-**Response (201):** The full key is returned **only this once** — copy it immediately.
+**Response (201):** Full key returned **only once** — copy it immediately.
 
 ```json
 {
@@ -428,7 +406,7 @@ Key values are masked — only the first 8 and last 4 characters visible.
 }
 ```
 
-Key format: `wag_` prefix followed by 48 random hex characters.
+Key format: `wag_` prefix + 48 random hex characters.
 
 ---
 
@@ -440,53 +418,54 @@ Key format: `wag_` prefix followed by 48 random hex characters.
 
 ## Real-Time Updates (Socket.IO)
 
-The backend emits a `instance_status` event over Socket.IO whenever an instance changes state. The admin dashboard subscribes to this event and updates the UI without polling.
+The backend emits Socket.IO events for all state changes. The dashboard subscribes to these and updates without polling.
 
-**Event payload:**
+| Event | When | Payload |
+|-------|------|---------|
+| `instances_init` | On socket connect | Array of all instances with current status and QR |
+| `instance_status` | On any state change | Single instance object (includes `qr` when available) |
+| `instance_added` | New instance created | Instance object |
+| `instance_removed` | Instance deleted | `{ id }` |
+
+**`instance_status` payload:**
 ```json
 {
   "id": "wa1",
   "name": "WhatsApp 1",
-  "status": "connected",
-  "phone": "628111000111",
-  "waName": "Your Name"
+  "status": "connecting",
+  "phone": null,
+  "waName": null,
+  "qr": "data:image/png;base64,..."
 }
 ```
 
-Emitted on: QR generated, connection established, disconnection, logout.
+`qr` is `null` when connected or not yet generated.
 
 ---
 
 ## Example cURL
 
 ```bash
-# Send to a group
+# Send to a group via alias
 curl -X POST http://localhost:3000/send-message \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer wag_your_api_key_here" \
-  -d '{
-    "message": "🚨 *Alert:* Router01 is DOWN",
-    "id": "120363025600132873@g.us"
-  }'
+  -d '{"message": "🚨 *Alert:* Router01 is DOWN", "id": "alert-it"}'
 
 # Send to a personal number via a specific instance
 curl -X POST http://localhost:3000/send-message \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer wag_your_api_key_here" \
-  -d '{
-    "message": "Test message",
-    "id": "628123456789",
-    "from": "wa1"
-  }'
+  -H "x-api-key: wag_your_api_key_here" \
+  -d '{"message": "Test message", "id": "628123456789", "from": "wa1"}'
+
+# Send via form-urlencoded (no custom headers)
+curl -X POST http://localhost:3000/send-message \
+  -d "apikey=wag_your_api_key_here&id=alert-it&message=Hello"
 
 # Get JWT (dashboard login)
 curl -X POST http://localhost:3000/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}'
-
-# Get recent logs (last 50)
-curl "http://localhost:3000/logs?limit=50" \
-  -H "Authorization: Bearer <jwt>"
 ```
 
 ---
@@ -494,11 +473,10 @@ curl "http://localhost:3000/logs?limit=50" \
 ## SolarWinds Setup
 
 1. In SolarWinds Alert Manager, create a new alert action → **HTTP POST**
-2. URL: `http://<server-ip>:3000/send-message` (or add `?apikey=YOUR_API_KEY`)
-3. Authentication: **Token** (if not using query param or whitelist)
-4. Token: paste the key generated from **Settings → API Keys**
-5. Content-Type: `application/json`
-6. Body:
+2. URL: `http://<server-ip>:3000/send-message`
+3. Authentication: **Token** → paste the key from **Settings → API Keys**
+4. Content-Type: `application/json`
+5. Body:
 ```json
 {
   "message": "🚨 *Device Down Alert*\n\n*Device :* ${NodeName}\n*IP Address :* ${IP_Address}\n*Status :* DOWN",
@@ -516,33 +494,11 @@ curl "http://localhost:3000/logs?limit=50" \
 | Page | Path | Description |
 |------|------|-------------|
 | Dashboard | `/` | Overview of all instances — status, phone, WhatsApp name |
-| Instances | `/instances` | Add/remove instances, scan QR (auto-refreshes every 3s), reset session |
+| Instances | `/instances` | Add/remove instances, scan QR (real-time via socket), reset session |
 | Groups | `/groups` | Browse and search group IDs per connected instance, set Aliases |
 | Logs | `/logs` | Message history — status, source IP, instance, recipient, message preview |
 | Docs | `/docs` | Interactive API documentation and request examples |
 | Settings | `/settings` | API Keys, Group Aliases, Allowed IPs (Whitelist), and Users |
-
-### Dashboard
-Shows all instances as cards with status badges (connected/connecting/disconnected). When more than one instance is connected, a hint banner shows the `from` field usage example.
-
-### Instances
-- Instance list auto-polls every 5 seconds + receives real-time Socket.IO updates
-- Click **QR** on a disconnected instance to open the QR modal
-- QR modal auto-refreshes every 3 seconds; automatically shows "Connected!" when scan completes
-- **Reset** disconnects, wipes session, and immediately opens a new QR modal
-- Instance ID can be clicked to copy to clipboard
-
-### Groups
-- Automatically selects the first connected instance
-- Instance switcher appears when multiple instances are connected
-- Groups sorted alphabetically with live search (by name or group ID)
-- Hover a group to reveal the **Copy ID** button
-
-### Settings
-- **API Keys:** Generate named keys; full key value is shown **once** immediately after creation
-- **Group Aliases:** Map long Group JIDs to easy-to-remember short names (e.g., `alert-it`)
-- **Allowed IPs:** Whitelist IP addresses (single, CIDR, wildcard) that can bypass API key authentication
-- **Users:** Manage admin accounts (min 6 char password, cannot delete your own account)
 
 ---
 
@@ -554,7 +510,47 @@ Multiple WhatsApp accounts run simultaneously. Each instance has its own indepen
 - QR modal opens automatically after adding — scan to link that account
 - Use `"from": "<instance-id>"` in the API body to route through a specific account
 - If `from` is omitted, the first connected instance is used
-- Instances persist across restarts via `data/instances.json` (Docker bind-mount)
+- Instance metadata persists across restarts in the SQLite database
+
+---
+
+## Data Storage
+
+All application data is stored in a **SQLite database** (`gateway.db`) persisted via a Docker named volume (`db_data`).
+
+| Table | Data |
+|-------|------|
+| `users` | Admin dashboard accounts (bcrypt-hashed passwords) |
+| `api_keys` | Named API keys for external integrations |
+| `instances` | Registered WhatsApp instance metadata |
+| `group_aliases` | Short name → Group JID mappings |
+| `allowed_ips` | IP whitelist (single IP, CIDR, wildcard) |
+| `message_logs` | All send attempts with status (90-day retention) |
+
+WhatsApp session credentials are stored separately in `sessions/<id>/` (Baileys multi-file auth state) and persisted via a bind mount.
+
+**Inspect the database:**
+```bash
+# Find volume path on host
+docker volume inspect wa-gateway-v2_db_data
+
+# Open SQLite shell inside container
+docker exec -it <backend-container> sh
+sqlite3 /app/data/gateway.db
+.tables
+SELECT username, role, created_at FROM users;
+```
+
+---
+
+## Queue Behaviour
+
+| Mode | Condition | Behaviour |
+|------|-----------|-----------|
+| BullMQ + Redis | Redis reachable on startup | Jobs queued, 3 attempts, exponential backoff (2s → 4s → 8s) |
+| Direct (fallback) | Redis unavailable | Send immediately in-process, same 3-attempt backoff |
+
+The app detects Redis availability at startup automatically.
 
 ---
 
@@ -570,50 +566,48 @@ WA-Gateway/
 │   │   │   ├── auth.controller.js       # POST /auth/login
 │   │   │   ├── message.controller.js    # POST /send-message
 │   │   │   ├── instance.controller.js   # /instances/* CRUD + QR + groups
-│   │   │   ├── status.controller.js     # GET /status (legacy, all instances)
+│   │   │   ├── status.controller.js     # GET /status (legacy)
 │   │   │   ├── log.controller.js        # GET /logs
 │   │   │   ├── groupAlias.controller.js # /admin/group-aliases CRUD
 │   │   │   ├── allowedIp.controller.js  # /admin/allowed-ips CRUD
 │   │   │   └── settings.controller.js   # /admin/users, /admin/apikeys
 │   │   ├── services/
-│   │   │   ├── waManager.js             # Multi-instance Baileys manager + contacts cache
+│   │   │   ├── db.js                    # SQLite init, schema, JSON migration
+│   │   │   ├── waManager.js             # Multi-instance Baileys manager
 │   │   │   ├── queue.service.js         # BullMQ + Redis with direct-send fallback
-│   │   │   ├── log.service.js           # NDJSON append log (getLogs / addLog)
-│   │   │   ├── user.service.js          # Users in data/users.json (bcrypt hashed)
-│   │   │   ├── apikey.service.js        # API keys in data/apikeys.json
-│   │   │   ├── groupAlias.service.js    # Persist and resolve aliases
-│   │   │   └── allowedIp.service.js     # Whitelist matching (CIDR/wildcard)
+│   │   │   ├── log.service.js           # Message logs (SQLite)
+│   │   │   ├── user.service.js          # Users (SQLite, bcrypt)
+│   │   │   ├── apikey.service.js        # API keys (SQLite)
+│   │   │   ├── groupAlias.service.js    # Group aliases (SQLite)
+│   │   │   └── allowedIp.service.js     # IP whitelist (SQLite, CIDR/wildcard)
 │   │   ├── middlewares/
-│   │   │   ├── auth.middleware.js       # API key validation (Bearer / x-api-key)
+│   │   │   ├── auth.middleware.js       # API key validation (Bearer / x-api-key / body)
 │   │   │   ├── jwt.middleware.js        # JWT validation + signToken()
-│   │   │   └── rateLimit.middleware.js  # 100 req/min per IP (skips /health)
+│   │   │   └── rateLimit.middleware.js  # 100 req/min per IP
 │   │   └── utils/idNormalizer.js        # Converts any ID format → WhatsApp JID
 │   ├── .dockerignore
 │   └── Dockerfile                       # Multi-stage: builder (native addons) → slim runtime
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx                      # Routes, auth guard, Socket.IO `instance_status` listener
-│   │   ├── context/AuthContext.jsx      # Login state, JWT in localStorage, auto-logout on 401
+│   │   ├── App.jsx                      # Routes, auth guard, Socket.IO listeners
+│   │   ├── context/AuthContext.jsx      # Login state, JWT in localStorage
 │   │   ├── services/
 │   │   │   ├── api.js                   # Axios instance with JWT interceptor
-│   │   │   └── socket.js               # Socket.IO singleton (connects to /)
+│   │   │   └── socket.js               # Socket.IO singleton
 │   │   ├── pages/
-│   │   │   ├── Login.jsx                # Login form
-│   │   │   ├── Dashboard.jsx            # Instance overview cards
-│   │   │   ├── Instances.jsx            # Instance management + QR modal (3s poll)
-│   │   │   ├── Groups.jsx               # Group browser with search + instance selector
-│   │   │   ├── Logs.jsx                 # Collapsible log entries, auto-refresh 15s
-│   │   │   ├── Docs.jsx                 # API documentation and usage examples
-│   │   │   └── Settings.jsx             # API Keys, Group Aliases, Allowed IPs, Users
+│   │   │   ├── Login.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── Instances.jsx            # QR modal with real-time socket updates
+│   │   │   ├── Groups.jsx
+│   │   │   ├── Logs.jsx
+│   │   │   ├── Docs.jsx
+│   │   │   └── Settings.jsx
 │   │   └── components/
-│   │       ├── Layout.jsx               # Sidebar navigation + logout
-│   │       └── StatusBadge.jsx          # connected / connecting / disconnected pill
+│   │       ├── Layout.jsx               # Sidebar + Phillip Securities branding
+│   │       └── StatusBadge.jsx
 │   ├── nginx.conf                       # SPA fallback + /api/* + /socket.io/ proxy
-│   ├── .dockerignore
 │   └── Dockerfile                       # Multi-stage: Vite build → nginx:alpine
-├── sessions/                            # Baileys session files — git-ignored, Docker bind-mounted
-├── logs/                                # messages.log (NDJSON) — git-ignored, Docker bind-mounted
-├── data/                                # instances.json, users.json, apikeys.json — git-ignored, Docker bind-mounted
+├── sessions/                            # Baileys session files — bind-mounted
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
@@ -621,25 +615,14 @@ WA-Gateway/
 
 ---
 
-## Queue Behaviour
-
-| Mode | Condition | Behaviour |
-|------|-----------|-----------|
-| BullMQ + Redis | Redis reachable on startup | Jobs queued, 3 attempts, exponential backoff (2s → 4s → 8s) |
-| Direct (fallback) | Redis unavailable | Send immediately in-process, same 3-attempt backoff |
-
-The app detects Redis availability at startup automatically — no config change required to switch modes.
-
----
-
 ## Security Notes
 
-- **API keys** are stored in plaintext in `data/apikeys.json` — the file is git-ignored and Docker bind-mounted; do not expose this directory
+- **API keys** are stored in the SQLite database — accessible only within the Docker volume
 - **Passwords** are bcrypt-hashed (cost 10) — never stored in plaintext
 - **JWT** sessions expire after 8 hours — set a strong `JWT_SECRET` in `.env`
 - **Rate limiting** — 100 requests/minute/IP on all non-health endpoints
-- `sessions/`, `logs/`, and `data/` are all git-ignored — never commit these directories
-- In production: firewall port `3001` (admin UI) to internal network; port `3000` only if direct API access is needed
+- `sessions/` is git-ignored — never commit session files
+- In production: firewall port `3001` (admin UI) to internal network only
 
 ---
 
