@@ -7,7 +7,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ git
 
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # ── Stage 2: Production image (lean — no build tools) ─────────────────────────
 FROM node:20-alpine
