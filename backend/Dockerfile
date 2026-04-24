@@ -20,11 +20,11 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy application source
 COPY . .
 
-# Pre-create runtime directories and drop to non-root user
-RUN mkdir -p sessions data \
-    && addgroup -S appgroup \
+# Create non-root user; only grant write access to runtime directories
+RUN addgroup -S appgroup \
     && adduser -S appuser -G appgroup \
-    && chown -R appuser:appgroup /app
+    && mkdir -p sessions data \
+    && chown appuser:appgroup sessions data
 
 USER appuser
 
