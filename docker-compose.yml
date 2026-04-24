@@ -9,6 +9,7 @@ services:
 
   # ── Redis ────────────────────────────────────────────────────────────────────
   redis:
+    container_name: wa-redis
     image: redis:7-alpine
     restart: always
     command: redis-server --appendonly yes
@@ -20,10 +21,11 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - wa_net
+      - wa-network
 
   # ── Backend (Node.js + Baileys) ───────────────────────────────────────────
   backend:
+    container_name: wa-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -51,10 +53,11 @@ services:
       start_period: 20s
       retries: 3
     networks:
-      - wa_net
+      - wa-network
 
   # ── SQLite Web (database browser) ────────────────────────────────────────
   sqlite-web:
+    container_name: wa-sqliteweb
     image: coleifer/sqlite-web
     restart: always
     ports:
@@ -68,10 +71,11 @@ services:
       backend:
         condition: service_healthy
     networks:
-      - wa_net
+      - wa-network
 
   # ── Frontend (React + nginx) ──────────────────────────────────────────────
   frontend:
+    container_name: wa-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -85,7 +89,7 @@ services:
       backend:
         condition: service_healthy
     networks:
-      - wa_net
+      - wa-network
 
 # ── Volumes ───────────────────────────────────────────────────────────────────
 volumes:
@@ -94,5 +98,6 @@ volumes:
 
 # ── Networks ──────────────────────────────────────────────────────────────────
 networks:
-  wa_net:
+  wa-network:
+    name: wa-network
     driver: bridge
