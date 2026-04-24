@@ -14,23 +14,27 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# su-exec: lightweight privilege-drop helper (used in entrypoint)
+RUN apk add --no-cache su-exec
+
 # Copy installed modules from builder stage
 COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application source
 COPY . .
 
-# Create non-root user; only grant write access to runtime directories
+# Create non-root user and pre-create runtime directories.
+# Ownership of /app/data and /app/sessions is fixed at container start
+# by docker-entrypoint.sh (handles named-volume root ownership).
 RUN addgroup -S appgroup \
     && adduser -S appuser -G appgroup \
     && mkdir -p sessions data \
-    && chown appuser:appgroup sessions data
-
-USER appuser
+    && chmod +x docker-entrypoint.sh
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "src/server.js"]
