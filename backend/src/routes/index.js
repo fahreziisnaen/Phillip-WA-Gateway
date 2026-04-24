@@ -28,6 +28,11 @@ import {
   setGroupAliasController,
   deleteGroupAliasController,
 } from '../controllers/groupAlias.controller.js';
+import {
+  listAllowedIpsController,
+  addAllowedIpController,
+  removeAllowedIpController,
+} from '../controllers/allowedIp.controller.js';
 
 export function registerRoutes(app) {
   // ── Public ──────────────────────────────────────────────────────────────────
@@ -69,6 +74,11 @@ export function registerRoutes(app) {
   app.get('/admin/group-aliases', jwtMiddleware, listGroupAliasesController);
   app.post('/admin/group-aliases', jwtMiddleware, setGroupAliasController);
   app.delete('/admin/group-aliases/:alias', jwtMiddleware, deleteGroupAliasController);
+
+  // Allowed IPs (whitelist)
+  app.get('/admin/allowed-ips', jwtMiddleware, listAllowedIpsController);
+  app.post('/admin/allowed-ips', jwtMiddleware, addAllowedIpController);
+  app.delete('/admin/allowed-ips/:ip', jwtMiddleware, removeAllowedIpController);
 
   // ── 404 ─────────────────────────────────────────────────────────────────────
   app.use((req, res) => {

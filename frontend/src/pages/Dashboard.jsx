@@ -218,16 +218,58 @@ $response = curl_exec($ch);`;
         <div className="border-t border-gray-100">
           {/* Auth info */}
           <div className="px-5 py-4 bg-amber-50 border-b border-amber-100">
-            <p className="text-xs font-semibold text-amber-800 mb-1">Authentication (wajib)</p>
-            <p className="text-xs text-amber-700 mb-2">
-              Sertakan salah satu header berikut di setiap request:
+            <p className="text-xs font-semibold text-amber-800 mb-2">Authentication</p>
+            <p className="text-xs text-amber-700 mb-3">
+              Gunakan salah satu metode berikut (diproses berurutan):
             </p>
-            <div className="space-y-1">
-              <CodeLine label="Bearer Token" code="Authorization: Bearer YOUR_API_KEY" />
-              <CodeLine label="API Key" code="x-api-key: YOUR_API_KEY" />
+            <div className="space-y-2.5">
+              {/* Method 1 - IP Whitelist */}
+              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-200/60">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded">1</span>
+                  <span className="text-xs font-semibold text-amber-900">IP Whitelist</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">tanpa API key</span>
+                </div>
+                <p className="text-[11px] text-amber-700 leading-relaxed">
+                  Jika IP pengirim sudah di-whitelist, request langsung diizinkan tanpa API key.
+                  Ideal untuk <strong>PRTG</strong>, Zabbix, atau sistem yang tidak bisa set custom header.
+                </p>
+              </div>
+              {/* Methods 2-3 - Headers */}
+              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-200/60">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded">2–3</span>
+                  <span className="text-xs font-semibold text-amber-900">HTTP Header</span>
+                </div>
+                <div className="space-y-1">
+                  <CodeLine label="Bearer" code="Authorization: Bearer YOUR_API_KEY" />
+                  <CodeLine label="API Key" code="x-api-key: YOUR_API_KEY" />
+                </div>
+              </div>
+              {/* Method 4 - Body field */}
+              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-200/60">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded">4</span>
+                  <span className="text-xs font-semibold text-amber-900">Body Field</span>
+                  <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">form-urlencoded</span>
+                </div>
+                <p className="text-[11px] text-amber-700 mb-1">
+                  Tambahkan field <code className="bg-amber-100 px-1 rounded font-mono">apikey</code> di body request:
+                </p>
+                <CodeLine label="Body" code="apikey=YOUR_API_KEY&id=628...&message=Hello" />
+              </div>
+              {/* Method 5 - Query param */}
+              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-200/60">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded">5</span>
+                  <span className="text-xs font-semibold text-amber-900">Query Parameter</span>
+                </div>
+                <CodeLine label="URL" code="POST /send-message?apikey=YOUR_API_KEY" />
+              </div>
             </div>
-            <p className="text-xs text-amber-600 mt-2">
-              API key dikelola di halaman <Link to="/settings" className="underline font-medium">Settings → API Keys</Link>.
+            <p className="text-xs text-amber-600 mt-3">
+              API key dikelola di <Link to="/settings" className="underline font-medium">Settings → API Keys</Link>.
+              IP whitelist di <Link to="/settings" className="underline font-medium">Settings → Allowed IPs</Link>.
             </p>
           </div>
 
@@ -238,6 +280,7 @@ $response = curl_exec($ch);`;
               <FieldRow name="id" type="string" required desc='Nomor WhatsApp (e.g. "628123456789"), Group JID (e.g. "120363...@g.us"), atau Group Alias (e.g. "alert-it"). Alias dibuat di Settings → Group Aliases.' />
               <FieldRow name="message" type="string" required desc="Isi pesan yang akan dikirim." />
               <FieldRow name="from" type="string" required={false} desc={`Instance ID yang digunakan untuk mengirim. Jika kosong, pakai instance pertama yang connected.`} />
+              <FieldRow name="apikey" type="string" required={false} desc='API key (alternatif jika tidak bisa set header). Bisa juga dikirim via query param ?apikey=xxx. Tidak perlu jika IP sudah di-whitelist.' />
             </div>
           </div>
 
@@ -317,6 +360,31 @@ $response = curl_exec($ch);`;
             {/* PHP */}
             <p className="text-[11px] text-gray-400 font-medium mt-3 mb-1">PHP (cURL)</p>
             <CodeBlock code={format === 'json' ? phpJson : phpForm} />
+
+            {/* PRTG example */}
+            {format === 'form' && (
+              <div className="mt-4 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5">
+                <p className="text-[11px] font-semibold text-orange-800 mb-1">💡 Contoh untuk PRTG HTTP Push / Notification</p>
+                <p className="text-[11px] text-orange-700 mb-2 leading-relaxed">
+                  PRTG tidak bisa set custom header. Gunakan salah satu cara:
+                </p>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Opsi A: IP Whitelist (tanpa API key)</p>
+                    <CodeBlock code={`id=alert-it&message=[%sitename] %device %sensor %status`} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Opsi B: API key di body</p>
+                    <CodeBlock code={`apikey=YOUR_API_KEY&id=alert-it&message=[%sitename] %device %sensor %status`} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Opsi C: API key di URL query</p>
+                    <CodeBlock code={`URL: https://yourdomain.com/send-message?apikey=YOUR_API_KEY
+Body: id=alert-it&message=[%sitename] %device %sensor %status`} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Response */}

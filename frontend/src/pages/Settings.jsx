@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Shield,
   AlertTriangle,
   CheckCircle2,
   X,
@@ -27,6 +28,9 @@ import {
   fetchGroupAliases,
   setGroupAlias,
   deleteGroupAlias,
+  fetchAllowedIps,
+  addAllowedIp,
+  removeAllowedIp,
 } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -34,6 +38,7 @@ const TABS = [
   { id: 'apikeys', label: 'API Keys', Icon: Key },
   { id: 'users', label: 'Users', Icon: Users },
   { id: 'aliases', label: 'Group Aliases', Icon: Hash },
+  { id: 'ips', label: 'Allowed IPs', Icon: Shield },
 ];
 
 export default function Settings() {
@@ -70,6 +75,7 @@ export default function Settings() {
       {tab === 'apikeys' && <ApiKeysTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'aliases' && <GroupAliasesTab />}
+      {tab === 'ips' && <AllowedIpsTab />}
     </div>
   );
 }
@@ -668,6 +674,172 @@ function GroupAliasesTab() {
             ))}
           </ul>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Allowed IPs Tab ───────────────────────────────────────────────────────────
+
+function AllowedIpsTab() {
+  const [ips, setIps] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [flash, setFlash] = useState(null);
+  const [form, setForm] = useState({ ip: '', label: '' });
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetchAllowedIps();
+      setIps(res.data);
+    } catch (err) {
+      showFlash('error', err.response?.data?.error ?? 'Gagal memuat daftar IP');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function showFlash(type, text) {
+    setFlash({ type, text });
+    setTimeout(() => setFlash(null), 4000);
+  }
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    if (!form.ip.trim()) return;
+    setSaving(true);
+    try {
+      await addAllowedIp(form.ip.trim(), form.label.trim());
+      showFlash('success', `IP "${form.ip.trim()}" berhasil ditambahkan`);
+      setForm({ ip: '', label: '' });
+      await load();
+    } catch (err) {
+      showFlash('error', err.response?.data?.error ?? 'Gagal menambahkan IP');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRemove(ip) {
+    if (!window.confirm(`Hapus IP "${ip}" dari whitelist?`)) return;
+    try {
+      await removeAllowedIp(ip);
+      showFlash('success', `IP "${ip}" dihapus`);
+      await load();
+    } catch (err) {
+      showFlash('error', err.response?.data?.error ?? 'Gagal menghapus IP');
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {flash && <Flash flash={flash} />}
+
+      {/* Info */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-700">
+        <p className="font-semibold mb-1">IP Whitelist — Akses Tanpa API Key</p>
+        <p className="text-xs text-blue-600 leading-relaxed">
+          Request dari IP yang di-whitelist akan otomatis diizinkan <strong>tanpa perlu API key</strong>.
+          Cocok untuk sistem seperti <strong>PRTG</strong> yang tidak bisa mengirim custom header.
+          Mendukung format: IP tunggal (<code className="bg-blue-100 px-1 rounded font-mono">192.168.1.100</code>),
+          CIDR (<code className="bg-blue-100 px-1 rounded font-mono">10.0.0.0/24</code>),
+          atau wildcard (<code className="bg-blue-100 px-1 rounded font-mono">172.16.*.*</code>).
+        </p>
+      </div>
+
+      {/* Add form */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <h2 className="text-sm font-semibold text-gray-800 mb-3">Tambah IP ke Whitelist</h2>
+        <form onSubmit={handleAdd} className="flex gap-2 flex-wrap">
+          <div className="flex-1 min-w-44">
+            <input
+              type="text"
+              placeholder="IP address, CIDR, atau wildcard"
+              value={form.ip}
+              onChange={(e) => setForm({ ...form, ip: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
+              required
+            />
+          </div>
+          <div className="flex-1 min-w-36">
+            <input
+              type="text"
+              placeholder="Label (e.g. PRTG Server)"
+              value={form.label}
+              onChange={(e) => setForm({ ...form, label: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={saving || !form.ip.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 bg-wa-green hover:bg-wa-teal disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors shadow-sm whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            {saving ? 'Menambahkan…' : 'Tambah'}
+          </button>
+        </form>
+      </div>
+
+      {/* IP list */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">
+            Daftar Allowed IPs
+            {ips.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-gray-400">({ips.length})</span>
+            )}
+          </h2>
+          <button onClick={load} disabled={loading} className="text-gray-400 hover:text-gray-600">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {!loading && ips.length === 0 && (
+          <div className="text-center py-10 text-gray-400 text-sm">
+            Belum ada IP di whitelist. Semua request wajib pakai API key.
+          </div>
+        )}
+
+        {ips.length > 0 && (
+          <ul className="divide-y divide-gray-50">
+            {ips.map((entry) => (
+              <li key={entry.ip} className="flex items-center gap-4 px-5 py-3.5 group">
+                <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Shield className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <code className="text-sm font-mono font-semibold text-gray-800">{entry.ip}</code>
+                  {entry.label && (
+                    <span className="ml-2 text-xs text-gray-400">— {entry.label}</span>
+                  )}
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Ditambahkan {new Date(entry.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleRemove(entry.ip)}
+                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Warning */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-700 leading-relaxed">
+          <strong>Hati-hati:</strong> IP yang di-whitelist bisa mengirim pesan tanpa autentikasi.
+          Pastikan hanya memasukkan IP server internal yang terpercaya (seperti PRTG, SolarWinds, Zabbix).
+        </p>
       </div>
     </div>
   );

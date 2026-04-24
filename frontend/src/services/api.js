@@ -74,4 +74,11 @@ export const setGroupAlias = (alias, jid, label) =>
 export const deleteGroupAlias = (alias) =>
   api.delete(`/admin/group-aliases/${encodeURIComponent(alias)}`);
 
+// ── Allowed IPs (whitelist) ────────────────────────────────────────────────────
+export const fetchAllowedIps = () => api.get('/admin/allowed-ips');
+export const addAllowedIp = (ip, label) =>
+  api.post('/admin/allowed-ips', { ip, label });
+export const removeAllowedIp = (ip) =>
+  api.delete(`/admin/allowed-ips/${encodeURIComponent(ip)}`);
+
 export default api;
