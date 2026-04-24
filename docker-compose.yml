@@ -35,13 +35,12 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DB_PATH=/app/data/gateway.db
     volumes:
       # Persist WhatsApp sessions (QR scan survives container restart)
       - ./sessions:/app/sessions
-      # Persist message logs
-      - ./logs:/app/logs
-      # Persist app data: instances, users, API keys
-      - ./data:/app/data
+      # Persist SQLite database (users, API keys, instances, aliases, logs)
+      - db_data:/app/data
     depends_on:
       redis:
         condition: service_healthy
@@ -74,6 +73,7 @@ services:
 # ── Volumes ───────────────────────────────────────────────────────────────────
 volumes:
   redis_data:
+  db_data:
 
 # ── Networks ──────────────────────────────────────────────────────────────────
 networks:

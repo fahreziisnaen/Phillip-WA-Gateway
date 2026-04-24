@@ -27,12 +27,11 @@ import qrcode from 'qrcode';
 import fs from 'fs-extra';
 import path from 'path';
 import pino from 'pino';
+import db from './db.js';
 
 const SESSIONS_ROOT = process.env.SESSION_DIR
   ? path.resolve(process.env.SESSION_DIR)
   : path.join(process.cwd(), 'sessions');
-
-const INSTANCES_FILE = path.join(process.cwd(), 'data', 'instances.json');
 
 const logger = pino({ level: 'silent' });
 
@@ -51,19 +50,6 @@ let ioInstance = null;
 /** @type {Set<string>} tracks which instance ids are currently connecting */
 const connecting = new Set();
 
-// ── Persistence helpers ───────────────────────────────────────────────────────
-
-async function loadPersistedInstances() {
-  await fs.ensureDir(path.dirname(INSTANCES_FILE));
-  if (!(await fs.pathExists(INSTANCES_FILE))) return [];
-  return fs.readJson(INSTANCES_FILE);
-}
-
-async function savePersistedInstances() {
-  const list = [...instances.values()].map(({ id, name }) => ({ id, name }));
-  await fs.writeJson(INSTANCES_FILE, list, { spaces: 2 });
-}
-
 // ── Socket.IO emitter ─────────────────────────────────────────────────────────
 
 function emitInstanceStatus(id) {
@@ -76,6 +62,7 @@ function emitInstanceStatus(id) {
     status: inst.status,
     phone: inst.phone,
     waName: inst.waName,
+    qr: inst.qr ?? null,
   });
 }
 
@@ -191,19 +178,12 @@ async function connectInstance(id) {
 
 export async function initManager(io) {
   ioInstance = io;
-  const persisted = await loadPersistedInstances();
+  const persisted = db.prepare('SELECT id, name FROM instances').all();
 
   for (const { id, name } of persisted) {
-    instances.set(id, {
-      id, name,
-      sock: null, status: 'disconnected',
-      qr: null, phone: null, waName: null,
-    });
+    instances.set(id, { id, name, sock: null, status: 'disconnected', qr: null, phone: null, waName: null });
   }
 
-  await savePersistedInstances();
-
-  // Start all connections
   for (const id of instances.keys()) {
     connectInstance(id);
   }
@@ -212,6 +192,12 @@ export async function initManager(io) {
 export function getAllInstances() {
   return [...instances.values()].map(({ id, name, status, phone, waName }) => ({
     id, name, status, phone, waName,
+  }));
+}
+
+export function getAllInstancesWithQR() {
+  return [...instances.values()].map(({ id, name, status, phone, waName, qr }) => ({
+    id, name, status, phone, waName, qr: qr ?? null,
   }));
 }
 
@@ -234,13 +220,8 @@ export async function addInstance(id, name) {
   if (!/^[a-z0-9_-]+$/i.test(id)) {
     throw new Error('Instance ID must be alphanumeric (letters, numbers, _ -)');
   }
-  instances.set(id, {
-    id, name,
-    sock: null, status: 'disconnected',
-    qr: null, phone: null, waName: null,
-  });
-  await savePersistedInstances();
-  // Notify dashboard immediately so the new instance appears in the list
+  db.prepare('INSERT INTO instances (id, name) VALUES (?, ?)').run(id, name);
+  instances.set(id, { id, name, sock: null, status: 'disconnected', qr: null, phone: null, waName: null });
   if (ioInstance) {
     ioInstance.emit('instance_added', { id, name, status: 'disconnected', phone: null, waName: null });
   }
@@ -258,7 +239,7 @@ export async function removeInstance(id) {
 
   instances.delete(id);
   contactsCache.delete(id);
-  await savePersistedInstances();
+  db.prepare('DELETE FROM instances WHERE id = ?').run(id);
 
   // Notify dashboard so the instance is removed from the list immediately
   if (ioInstance) {

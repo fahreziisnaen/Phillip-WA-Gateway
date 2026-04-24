@@ -32,7 +32,7 @@ export default function Layout({ children, instances = [], socketConnected }) {
   const connectedCount = instances.filter((i) => i.status === 'connected').length;
   const overallStatus = connectedCount > 0 ? 'connected'
     : instances.some((i) => i.status === 'connecting') ? 'connecting'
-    : 'disconnected';
+      : 'disconnected';
 
   const Sidebar = () => (
     <div className="flex flex-col h-full">
@@ -42,7 +42,7 @@ export default function Layout({ children, instances = [], socketConnected }) {
           <img src="/philliplogo.jpg" alt="Phillip Securities" className="w-9 h-9 object-contain rounded-sm" />
           <div>
             <p className="font-bold text-gray-900 leading-tight text-sm">Phillip WA Gateway</p>
-            <p className="text-[10px] text-gray-400 leading-tight">Phillip Securities HK</p>
+            <p className="text-[10px] text-gray-400 leading-tight">Phillip Securities HK Limited</p>
           </div>
         </div>
       </div>
@@ -57,11 +57,10 @@ export default function Layout({ children, instances = [], socketConnected }) {
         </div>
         {instances.slice(0, 3).map((inst) => (
           <div key={inst.id} className="flex items-center gap-1.5 mt-1">
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-              inst.status === 'connected' ? 'bg-green-500'
-              : inst.status === 'connecting' ? 'bg-yellow-400'
-              : 'bg-gray-300'
-            }`} />
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${inst.status === 'connected' ? 'bg-green-500'
+                : inst.status === 'connecting' ? 'bg-yellow-400'
+                  : 'bg-gray-300'
+              }`} />
             <span className="text-xs text-gray-500 truncate">{inst.name}</span>
             {inst.phone && (
               <span className="text-xs font-mono text-gray-400 ml-auto">+{inst.phone}</span>
@@ -82,11 +81,10 @@ export default function Layout({ children, instances = [], socketConnected }) {
               key={path}
               to={path}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                active
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active
                   ? 'bg-wa-green/10 text-wa-teal'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-              }`}
+                }`}
             >
               <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-wa-teal' : 'text-gray-400'}`} />
               {label}

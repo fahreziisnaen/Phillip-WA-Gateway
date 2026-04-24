@@ -10,7 +10,6 @@ import { addLog } from '../services/log.service.js';
  *   2. Authorization header → Bearer <key>
  *   3. x-api-key header    → <key>
  *   4. Body field           → apikey=<key>  (for form-urlencoded / PRTG)
- *   5. Query parameter      → ?apikey=<key>
  *
  * All authentication failures are recorded in the message log.
  */
@@ -30,7 +29,7 @@ export async function authMiddleware(req, res, next) {
     // If whitelist check fails, fall through to API key check
   }
 
-  // ── 2–5. Extract API key from multiple sources ────────────────────────────
+  // ── 2–4. Extract API key from multiple sources ────────────────────────────
   let token = null;
 
   // 2. Bearer token header
@@ -49,13 +48,8 @@ export async function authMiddleware(req, res, next) {
     token = String(req.body.apikey).trim() || null;
   }
 
-  // 5. Query parameter — ?apikey=xxx
-  if (!token && req.query?.apikey) {
-    token = String(req.query.apikey).trim() || null;
-  }
-
   if (!token) {
-    await addLog({
+    addLog({
       sourceIp,
       id: req.body?.id ?? null,
       message: req.body?.message ?? null,
@@ -69,7 +63,7 @@ export async function authMiddleware(req, res, next) {
 
   const valid = await isValidKey(token);
   if (!valid) {
-    await addLog({
+    addLog({
       sourceIp,
       id: req.body?.id ?? null,
       message: req.body?.message ?? null,

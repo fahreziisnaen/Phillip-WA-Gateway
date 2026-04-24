@@ -114,60 +114,6 @@ function ApiDocs({ instances = [] }) {
   --data-urlencode "message=Hello World!" \\
   --data-urlencode "from=${exampleInstance}"`;
 
-  const jsJson = `fetch('/send-message', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'x-api-key': 'YOUR_API_KEY',
-  },
-  body: JSON.stringify({
-    id: '628123456789',
-    message: 'Hello World!',
-    from: '${exampleInstance}',
-  }),
-});`;
-
-  const jsForm = `fetch('/send-message', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'x-api-key': 'YOUR_API_KEY',
-  },
-  body: new URLSearchParams({
-    id: '628123456789',
-    message: 'Hello World!',
-    from: '${exampleInstance}',
-  }),
-});`;
-
-  const phpJson = `$ch = curl_init('https://yourdomain.com/send-message');
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-  'Content-Type: application/json',
-  'x-api-key: YOUR_API_KEY',
-]);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-  'id'      => '628123456789',
-  'message' => 'Hello World!',
-  'from'    => '${exampleInstance}',
-]));
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-$response = curl_exec($ch);`;
-
-  const phpForm = `$ch = curl_init('https://yourdomain.com/send-message');
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-  'x-api-key: YOUR_API_KEY',
-]);
-curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-  'id'      => '628123456789',
-  'message' => 'Hello World!',
-  'from'    => '${exampleInstance}',
-]));
-// Content-Type: application/x-www-form-urlencoded
-// is automatically sent by cURL when POSTFIELDS is a string
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-$response = curl_exec($ch);`;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -231,14 +177,6 @@ $response = curl_exec($ch);`;
                 </p>
                 <CodeLine label="Body" code="apikey=YOUR_API_KEY&id=628...&message=Hello" />
               </div>
-              {/* Method 5 - Query param */}
-              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-200/60">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded">5</span>
-                  <span className="text-xs font-semibold text-amber-900">Query Parameter</span>
-                </div>
-                <CodeLine label="URL" code="POST /send-message?apikey=YOUR_API_KEY" />
-              </div>
             </div>
             <p className="text-xs text-amber-600 mt-3">
               Manage API keys in <Link to="/settings" className="underline font-medium">Settings → API Keys</Link>.
@@ -253,7 +191,7 @@ $response = curl_exec($ch);`;
               <FieldRow name="id" type="string" required desc='WhatsApp number (e.g. "628123456789"), Group JID (e.g. "120363...@g.us"), or Group Alias (e.g. "alert-it").' />
               <FieldRow name="message" type="string" required desc="The message content to send." />
               <FieldRow name="from" type="string" required={false} desc='Instance ID to send from. If omitted, the first connected instance is used.' />
-              <FieldRow name="apikey" type="string" required={false} desc='API key (alternative if headers cannot be set). Can also be sent via query param ?apikey=xxx. Not required if the IP is whitelisted.' />
+              <FieldRow name="apikey" type="string" required={false} desc='API key (alternative if headers cannot be set). Not required if the IP is whitelisted.' />
             </div>
           </div>
 
@@ -308,37 +246,7 @@ $response = curl_exec($ch);`;
             <p className="text-[11px] text-gray-400 font-medium mt-3 mb-1">cURL</p>
             <CodeBlock code={format === 'json' ? curlJson : curlForm} />
 
-            {/* JavaScript */}
-            <p className="text-[11px] text-gray-400 font-medium mt-3 mb-1">JavaScript (fetch)</p>
-            <CodeBlock code={format === 'json' ? jsJson : jsForm} />
 
-            {/* PHP */}
-            <p className="text-[11px] text-gray-400 font-medium mt-3 mb-1">PHP (cURL)</p>
-            <CodeBlock code={format === 'json' ? phpJson : phpForm} />
-
-            {/* PRTG example */}
-            {format === 'form' && (
-              <div className="mt-4 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5">
-                <p className="text-[11px] font-semibold text-orange-800 mb-1">💡 Example for PRTG HTTP Push / Notification</p>
-                <p className="text-[11px] text-orange-700 mb-2 leading-relaxed">
-                  PRTG cannot set custom headers. Use one of the following methods:
-                </p>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Option A: IP Whitelist (no API key)</p>
-                    <CodeBlock code={`id=alert-it&message=[%sitename] %device %sensor %status`} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Option B: API key in body</p>
-                    <CodeBlock code={`apikey=YOUR_API_KEY&id=alert-it&message=[%sitename] %device %sensor %status`} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-orange-600 font-medium mb-0.5">Option C: API key in URL query</p>
-                    <CodeBlock code={`URL: https://yourdomain.com/send-message?apikey=YOUR_API_KEY\nBody: id=alert-it&message=[%sitename] %device %sensor %status`} />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Response */}

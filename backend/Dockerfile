@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Build tools needed for native Node.js addons (libsignal, sharp, etc.)
+# Build tools needed for native Node.js addons (better-sqlite3, libsignal, etc.)
 RUN apk add --no-cache python3 make g++ git
 
 COPY package.json package-lock.json* ./
@@ -20,8 +20,8 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy application source
 COPY . .
 
-# Pre-create runtime directories (bind-mounted volumes override these at runtime)
-RUN mkdir -p sessions logs data
+# Pre-create runtime directories (volumes override these at runtime)
+RUN mkdir -p sessions data
 
 EXPOSE 3000
 

@@ -1,78 +1,45 @@
-import fs from 'fs-extra';
-import path from 'path';
 import { randomBytes } from 'crypto';
+import db from './db.js';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const KEYS_FILE = path.join(DATA_DIR, 'apikeys.json');
-
-await fs.ensureDir(DATA_DIR);
-
-async function readKeys() {
-  if (!(await fs.pathExists(KEYS_FILE))) return [];
-  return fs.readJson(KEYS_FILE);
-}
-
-async function writeKeys(keys) {
-  await fs.writeJson(KEYS_FILE, keys, { spaces: 2 });
-}
-
-/** Generate a prefixed random API key: wag_<48 hex chars> */
 export function generateRawKey() {
   return 'wag_' + randomBytes(24).toString('hex');
 }
 
-export async function getAllKeys() {
-  return readKeys();
+export function getAllKeys() {
+  return db.prepare('SELECT * FROM api_keys ORDER BY created_at').all()
+    .map((k) => ({ ...k, createdAt: k.created_at, lastUsed: k.last_used }));
 }
 
-/**
- * Create a new named API key.
- * Returns the full entry including the plaintext key (shown only once).
- */
-export async function createKey(name) {
-  const keys = await readKeys();
+export function createKey(name) {
   const entry = {
     id: randomBytes(8).toString('hex'),
     name,
     key: generateRawKey(),
-    createdAt: new Date().toISOString(),
-    lastUsed: null,
+    created_at: new Date().toISOString(),
+    last_used: null,
   };
-  keys.push(entry);
-  await writeKeys(keys);
-  return entry; // caller shows the key once, then it's accessible via list (masked)
+  db.prepare('INSERT INTO api_keys (id, name, key, created_at, last_used) VALUES (?, ?, ?, ?, ?)')
+    .run(entry.id, entry.name, entry.key, entry.created_at, entry.last_used);
+  return { ...entry, createdAt: entry.created_at, lastUsed: entry.last_used };
 }
 
-export async function revokeKey(id) {
-  const keys = await readKeys();
-  const filtered = keys.filter((k) => k.id !== id);
-  if (filtered.length === keys.length) throw new Error('API key not found');
-  await writeKeys(filtered);
+export function revokeKey(id) {
+  const result = db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
+  if (result.changes === 0) throw new Error('API key not found');
 }
 
-/**
- * Validate a Bearer token against:
- *   1. API_KEY env variable (backwards compat)
- *   2. Stored keys in data/apikeys.json
- */
 export async function isValidKey(token) {
   if (!token) return false;
-
-  // Backwards compat: env key still works
   if (process.env.API_KEY && token === process.env.API_KEY) return true;
 
-  const keys = await readKeys();
-  const found = keys.find((k) => k.key === token);
-  if (found) {
-    found.lastUsed = new Date().toISOString();
-    await writeKeys(keys).catch(() => {}); // non-blocking, fire-and-forget
+  const row = db.prepare('SELECT id FROM api_keys WHERE key = ?').get(token);
+  if (row) {
+    db.prepare('UPDATE api_keys SET last_used = ? WHERE id = ?').run(new Date().toISOString(), row.id);
     return true;
   }
-
   return false;
 }
 
-/** Return a masked version of the key for display: wag_xxxx...xxxx */
 export function maskKey(key) {
   if (!key || key.length < 12) return '***';
   return key.slice(0, 8) + '••••••••' + key.slice(-4);

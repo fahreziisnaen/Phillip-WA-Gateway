@@ -1,36 +1,16 @@
-import fs from 'fs-extra';
-import path from 'path';
+import db from './db.js';
 
-const ALIASES_FILE = path.join(process.cwd(), 'data', 'group-aliases.json');
-
-async function read() {
-  await fs.ensureDir(path.dirname(ALIASES_FILE));
-  if (!(await fs.pathExists(ALIASES_FILE))) return [];
-  return fs.readJson(ALIASES_FILE);
+export function listAliases() {
+  return db.prepare('SELECT alias, jid, label, created_at FROM group_aliases ORDER BY alias').all()
+    .map((a) => ({ ...a, createdAt: a.created_at }));
 }
 
-async function write(aliases) {
-  await fs.writeJson(ALIASES_FILE, aliases, { spaces: 2 });
+export function resolveAlias(alias) {
+  const row = db.prepare('SELECT jid FROM group_aliases WHERE alias = ?').get(alias.toLowerCase());
+  return row?.jid ?? null;
 }
 
-export async function listAliases() {
-  return read();
-}
-
-/** Resolve alias name → JID, or null if not found. Case-insensitive. */
-export async function resolveAlias(alias) {
-  const all = await read();
-  const found = all.find((a) => a.alias.toLowerCase() === alias.toLowerCase());
-  return found?.jid ?? null;
-}
-
-/**
- * Create or update a group alias.
- * @param {string} alias   Short name (alphanumeric, _ -)
- * @param {string} jid     Group JID ending in @g.us
- * @param {string} label   Optional human-readable label
- */
-export async function setAlias(alias, jid, label = '') {
+export function setAlias(alias, jid, label = '') {
   if (!/^[a-z0-9_-]+$/i.test(alias)) {
     throw new Error('Alias may only contain letters, numbers, underscores, and hyphens');
   }
@@ -38,29 +18,20 @@ export async function setAlias(alias, jid, label = '') {
     throw new Error('JID must be a group JID ending with @g.us');
   }
 
-  const all = await read();
   const key = alias.toLowerCase();
-  const idx = all.findIndex((a) => a.alias.toLowerCase() === key);
+  const existing = db.prepare('SELECT alias FROM group_aliases WHERE alias = ?').get(key);
 
-  if (idx >= 0) {
-    all[idx] = { ...all[idx], alias: alias.toLowerCase(), jid, label: label || '' };
+  if (existing) {
+    db.prepare('UPDATE group_aliases SET jid = ?, label = ? WHERE alias = ?').run(jid, label || '', key);
   } else {
-    all.push({
-      alias: alias.toLowerCase(),
-      jid,
-      label: label || '',
-      createdAt: new Date().toISOString(),
-    });
+    db.prepare('INSERT INTO group_aliases (alias, jid, label, created_at) VALUES (?, ?, ?, ?)')
+      .run(key, jid, label || '', new Date().toISOString());
   }
 
-  await write(all);
-  return all[idx >= 0 ? idx : all.length - 1];
+  return db.prepare('SELECT * FROM group_aliases WHERE alias = ?').get(key);
 }
 
-export async function deleteAlias(alias) {
-  const all = await read();
-  const key = alias.toLowerCase();
-  const filtered = all.filter((a) => a.alias.toLowerCase() !== key);
-  if (filtered.length === all.length) throw new Error(`Alias "${alias}" not found`);
-  await write(filtered);
+export function deleteAlias(alias) {
+  const result = db.prepare('DELETE FROM group_aliases WHERE alias = ?').run(alias.toLowerCase());
+  if (result.changes === 0) throw new Error(`Alias "${alias}" not found`);
 }

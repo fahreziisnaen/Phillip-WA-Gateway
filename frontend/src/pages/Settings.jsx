@@ -60,11 +60,10 @@ export default function Settings() {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === id
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === id
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             <Icon className="w-4 h-4" />
             {label}
@@ -201,7 +200,7 @@ function ApiKeysTab() {
           </button>
         </form>
         <p className="text-xs text-gray-400 mt-2">
-          Use the key as <code className="bg-gray-100 px-1 rounded">Authorization: Bearer &lt;key&gt;</code> in SolarWinds or Postman.
+          Use the key as <code className="bg-gray-100 px-1 rounded">Authorization: Bearer &lt;key&gt;</code> in Client Side.
         </p>
       </div>
 
@@ -841,11 +840,10 @@ function Flash({ flash }) {
   const isSuccess = flash.type === 'success';
   return (
     <div
-      className={`flex items-start gap-2 px-4 py-3 rounded-xl border text-sm ${
-        isSuccess
+      className={`flex items-start gap-2 px-4 py-3 rounded-xl border text-sm ${isSuccess
           ? 'bg-green-50 border-green-200 text-green-700'
           : 'bg-red-50 border-red-200 text-red-700'
-      }`}
+        }`}
     >
       {isSuccess
         ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />

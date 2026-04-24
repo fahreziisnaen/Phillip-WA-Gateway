@@ -41,6 +41,8 @@ export default function Instances() {
   const [qrModal, setQrModal] = useState(null);
   // qrModal shape: { id, name, qr, error, status }
   const qrPollRef = useRef(null);
+  const qrModalRef = useRef(null);
+  useEffect(() => { qrModalRef.current = qrModal; }, [qrModal]);
 
   // Copy state
   const [copied, setCopied] = useState(null);
@@ -78,46 +80,58 @@ export default function Instances() {
     function onInstanceStatus(data) {
       setInstances((prev) => {
         const idx = prev.findIndex((i) => i.id === data.id);
-        if (idx === -1) return [...prev, data];
+        const record = { id: data.id, name: data.name, status: data.status, phone: data.phone, waName: data.waName };
+        if (idx === -1) return [...prev, record];
         const next = [...prev];
-        next[idx] = { ...next[idx], ...data };
+        next[idx] = { ...next[idx], ...record };
         return next;
       });
 
-      // If QR modal is open for this instance and it just connected → show success
+      // Update QR modal if it's open for this instance
       setQrModal((prev) => {
         if (!prev || prev.id !== data.id) return prev;
         if (data.status === 'connected') {
           stopQrPoll();
-          return { ...prev, status: 'connected', waName: data.waName, phone: data.phone };
+          return { ...prev, status: 'connected', waName: data.waName, phone: data.phone, qr: null };
         }
-        return { ...prev, status: data.status };
+        return { ...prev, status: data.status, ...(data.qr ? { qr: data.qr, error: null } : {}) };
       });
     }
 
     function onInstanceAdded(data) {
       setInstances((prev) => {
         if (prev.find((i) => i.id === data.id)) return prev;
-        return [...prev, data];
+        return [...prev, { id: data.id, name: data.name, status: data.status, phone: data.phone, waName: data.waName }];
       });
     }
 
     function onInstanceRemoved({ id }) {
       setInstances((prev) => prev.filter((i) => i.id !== id));
-      // Close QR modal if it was open for the removed instance
-      setQrModal((prev) => {
-        if (prev?.id === id) { stopQrPoll(); return null; }
-        return prev;
-      });
+      if (qrModalRef.current?.id === id) {
+        stopQrPoll();
+        setQrModal(null);
+      }
+    }
+
+    function onInstancesInit(list) {
+      setInstances(list.map(({ id, name, status, phone, waName }) => ({ id, name, status, phone, waName })));
+      // If QR modal is open and we now have QR data, update it
+      const modal = qrModalRef.current;
+      if (modal) {
+        const match = list.find((i) => i.id === modal.id);
+        if (match?.qr) setQrModal((prev) => prev ? { ...prev, qr: match.qr, error: null } : prev);
+      }
     }
 
     socket.on('instance_status', onInstanceStatus);
     socket.on('instance_added', onInstanceAdded);
     socket.on('instance_removed', onInstanceRemoved);
+    socket.on('instances_init', onInstancesInit);
     return () => {
       socket.off('instance_status', onInstanceStatus);
       socket.off('instance_added', onInstanceAdded);
       socket.off('instance_removed', onInstanceRemoved);
+      socket.off('instances_init', onInstancesInit);
     };
   }, []);
 
@@ -157,13 +171,11 @@ export default function Instances() {
 
     // Then poll
     qrPollRef.current = setInterval(() => {
-      // Stop polling if modal was closed or instance is connected
-      setQrModal((prev) => {
-        if (!prev || prev.id !== inst.id || prev.status === 'connected') {
-          stopQrPoll();
-        }
-        return prev;
-      });
+      const modal = qrModalRef.current;
+      if (!modal || modal.id !== inst.id || modal.status === 'connected') {
+        stopQrPoll();
+        return;
+      }
       refreshQR(inst.id);
     }, QR_POLL_MS);
   }
