@@ -192,7 +192,7 @@ export default function Instances() {
     e.preventDefault();
     setAdding(true);
     try {
-      const id = newId.trim();
+      const id = newId.trim().toLowerCase();
       const name = newName.trim();
       await addInstance(id, name);
       showFlash('success', `Instance "${name}" added. Scan the QR code to connect.`);
@@ -385,7 +385,7 @@ export default function Instances() {
                   type="text"
                   placeholder="wa2"
                   value={newId}
-                  onChange={(e) => setNewId(e.target.value.replace(/[^a-z0-9_-]/gi, ''))}
+                  onChange={(e) => setNewId(e.target.value.replace(/[^a-z0-9_-]/gi, '').toLowerCase())}
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
                   required
                   autoFocus
