@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  MessageCircle,
   LayoutDashboard,
   Smartphone,
   Users,
@@ -40,12 +39,10 @@ export default function Layout({ children, instances = [], socketConnected }) {
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-wa-green rounded-xl flex items-center justify-center shadow-sm">
-            <MessageCircle className="w-5 h-5 text-white" />
-          </div>
+          <img src="/philliplogo.jpg" alt="Phillip Securities" className="w-9 h-9 object-contain rounded-sm" />
           <div>
-            <p className="font-bold text-gray-900 leading-tight">WA Gateway</p>
-            <p className="text-[10px] text-gray-400 leading-tight">Admin Dashboard</p>
+            <p className="font-bold text-gray-900 leading-tight text-sm">Phillip WA Gateway</p>
+            <p className="text-[10px] text-gray-400 leading-tight">Phillip Securities HK</p>
           </div>
         </div>
       </div>
@@ -146,8 +143,8 @@ export default function Layout({ children, instances = [], socketConnected }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-wa-green" />
-            <span className="font-semibold text-gray-800">WA Gateway</span>
+            <img src="/philliplogo.jpg" alt="Phillip Securities" className="w-6 h-6 object-contain rounded-sm" />
+            <span className="font-semibold text-gray-800">Phillip WA Gateway</span>
           </div>
           <StatusBadge status={overallStatus} />
         </div>

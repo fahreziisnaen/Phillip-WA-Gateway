@@ -101,9 +101,16 @@ The Vite dev server proxies `/api/*` and `/socket.io/*` to `http://localhost:300
 
 | Route | Auth required |
 |-------|--------------|
-| `POST /send-message` | API key — `Authorization: Bearer <key>` or `x-api-key: <key>` |
+| `POST /send-message` | Multi-Auth (see below) |
 | `/instances/*`, `/logs`, `/admin/*` | JWT — `Authorization: Bearer <jwt>` (issued by `/auth/login`) |
 | `/health`, `/status`, `/auth/login` | None |
+
+For `POST /send-message`, authentication is checked in the following order:
+1. **IP Whitelist**: No API key needed if the sender IP is whitelisted (supports single IP, CIDR, wildcard).
+2. **HTTP Header**: `Authorization: Bearer <key>`
+3. **HTTP Header**: `x-api-key: <key>`
+4. **Body Field**: `apikey=<key>` (especially useful for `application/x-www-form-urlencoded`)
+5. **Query Parameter**: `?apikey=<key>`
 
 > **Rate limiting:** All endpoints (except `/health`) are limited to **100 requests per minute per IP**.
 
@@ -159,15 +166,22 @@ Returns status of all instances. Kept for backwards compatibility.
 
 ---
 
-### `POST /send-message` — API key required
+### `POST /send-message` — Multi-Auth supported
 
-**Request:**
+Accepts both `application/json` and `application/x-www-form-urlencoded`.
+
+**Request (JSON):**
 ```json
 {
   "message": "🚨 *Device Down Alert*\n\n*Device:* Core-Switch-01\n*IP:* 10.10.10.1\n*Status:* DOWN",
-  "id": "120363025600132873@g.us",
+  "id": "alert-it",
   "from": "wa1"
 }
+```
+
+**Request (Form URL-Encoded):**
+```
+id=alert-it&message=Hello%20World&apikey=YOUR_API_KEY
 ```
 
 | Field | Required | Description |
@@ -175,6 +189,7 @@ Returns status of all instances. Kept for backwards compatibility.
 | `message` | Yes | Text to send. Supports WhatsApp markdown: `*bold*`, `_italic_`, `~strikethrough~` |
 | `id` | Yes | Recipient — see accepted formats below |
 | `from` | No | Instance ID to send from (e.g. `wa1`). Defaults to the first connected instance. |
+| `apikey` | No | API key (fallback if headers cannot be used, e.g. from PRTG). |
 
 **Accepted `id` formats:**
 
@@ -184,6 +199,7 @@ Returns status of all instances. Kept for backwards compatibility.
 | `@c.us` suffix | Personal (legacy) | `628123456789@c.us` |
 | `@s.whatsapp.net` suffix | Personal | `628123456789@s.whatsapp.net` |
 | `@g.us` suffix | Group | `120363025600132873@g.us` |
+| Group Alias | Group | `alert-it` (configured in Settings) |
 
 **Response (202 Accepted):**
 ```json
@@ -478,8 +494,8 @@ curl "http://localhost:3000/logs?limit=50" \
 ## SolarWinds Setup
 
 1. In SolarWinds Alert Manager, create a new alert action → **HTTP POST**
-2. URL: `http://<server-ip>:3000/send-message`
-3. Authentication: **Token**
+2. URL: `http://<server-ip>:3000/send-message` (or add `?apikey=YOUR_API_KEY`)
+3. Authentication: **Token** (if not using query param or whitelist)
 4. Token: paste the key generated from **Settings → API Keys**
 5. Content-Type: `application/json`
 6. Body:
@@ -501,9 +517,10 @@ curl "http://localhost:3000/logs?limit=50" \
 |------|------|-------------|
 | Dashboard | `/` | Overview of all instances — status, phone, WhatsApp name |
 | Instances | `/instances` | Add/remove instances, scan QR (auto-refreshes every 3s), reset session |
-| Groups | `/groups` | Browse and search group IDs per connected instance |
+| Groups | `/groups` | Browse and search group IDs per connected instance, set Aliases |
 | Logs | `/logs` | Message history — status, source IP, instance, recipient, message preview |
-| Settings | `/settings` | API Keys tab and Users tab |
+| Docs | `/docs` | Interactive API documentation and request examples |
+| Settings | `/settings` | API Keys, Group Aliases, Allowed IPs (Whitelist), and Users |
 
 ### Dashboard
 Shows all instances as cards with status badges (connected/connecting/disconnected). When more than one instance is connected, a hint banner shows the `from` field usage example.
@@ -521,15 +538,11 @@ Shows all instances as cards with status badges (connected/connecting/disconnect
 - Groups sorted alphabetically with live search (by name or group ID)
 - Hover a group to reveal the **Copy ID** button
 
-### Settings — API Keys
-- Generate named keys; full key value is shown **once** immediately after creation
-- Listed keys show masked value, creation date, and last used date
-- Revoke any key permanently with confirmation dialog
-
-### Settings — Users
-- All users are `admin` role
-- Cannot delete your own account or the last remaining user
-- Change password modal accessible for any user (min 6 characters)
+### Settings
+- **API Keys:** Generate named keys; full key value is shown **once** immediately after creation
+- **Group Aliases:** Map long Group JIDs to easy-to-remember short names (e.g., `alert-it`)
+- **Allowed IPs:** Whitelist IP addresses (single, CIDR, wildcard) that can bypass API key authentication
+- **Users:** Manage admin accounts (min 6 char password, cannot delete your own account)
 
 ---
 
@@ -559,13 +572,17 @@ WA-Gateway/
 │   │   │   ├── instance.controller.js   # /instances/* CRUD + QR + groups
 │   │   │   ├── status.controller.js     # GET /status (legacy, all instances)
 │   │   │   ├── log.controller.js        # GET /logs
+│   │   │   ├── groupAlias.controller.js # /admin/group-aliases CRUD
+│   │   │   ├── allowedIp.controller.js  # /admin/allowed-ips CRUD
 │   │   │   └── settings.controller.js   # /admin/users, /admin/apikeys
 │   │   ├── services/
 │   │   │   ├── waManager.js             # Multi-instance Baileys manager + contacts cache
 │   │   │   ├── queue.service.js         # BullMQ + Redis with direct-send fallback
 │   │   │   ├── log.service.js           # NDJSON append log (getLogs / addLog)
 │   │   │   ├── user.service.js          # Users in data/users.json (bcrypt hashed)
-│   │   │   └── apikey.service.js        # API keys in data/apikeys.json
+│   │   │   ├── apikey.service.js        # API keys in data/apikeys.json
+│   │   │   ├── groupAlias.service.js    # Persist and resolve aliases
+│   │   │   └── allowedIp.service.js     # Whitelist matching (CIDR/wildcard)
 │   │   ├── middlewares/
 │   │   │   ├── auth.middleware.js       # API key validation (Bearer / x-api-key)
 │   │   │   ├── jwt.middleware.js        # JWT validation + signToken()
@@ -586,7 +603,8 @@ WA-Gateway/
 │   │   │   ├── Instances.jsx            # Instance management + QR modal (3s poll)
 │   │   │   ├── Groups.jsx               # Group browser with search + instance selector
 │   │   │   ├── Logs.jsx                 # Collapsible log entries, auto-refresh 15s
-│   │   │   └── Settings.jsx             # API Keys tab + Users tab
+│   │   │   ├── Docs.jsx                 # API documentation and usage examples
+│   │   │   └── Settings.jsx             # API Keys, Group Aliases, Allowed IPs, Users
 │   │   └── components/
 │   │       ├── Layout.jsx               # Sidebar navigation + logout
 │   │       └── StatusBadge.jsx          # connected / connecting / disconnected pill
