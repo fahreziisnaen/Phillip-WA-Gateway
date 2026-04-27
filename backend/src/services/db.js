@@ -92,21 +92,40 @@ if (!userCols.includes('must_change_password')) {
   console.log('[db] Migration: added must_change_password to users');
 }
 
-// FIX: migrate api_keys from plain key column to key_hash + key_prefix
+// FIX: migrate api_keys from plain key column to key_hash + key_prefix.
+// SQLite cannot DROP COLUMN on a UNIQUE column, so we rebuild the table.
 const keyCols = db.prepare('PRAGMA table_info(api_keys)').all().map((c) => c.name);
-if (keyCols.includes('key') && !keyCols.includes('key_hash')) {
-  db.exec('ALTER TABLE api_keys ADD COLUMN key_hash TEXT');
-  db.exec('ALTER TABLE api_keys ADD COLUMN key_prefix TEXT');
-  const rows = db.prepare('SELECT id, key FROM api_keys').all();
-  const update = db.prepare('UPDATE api_keys SET key_hash = ?, key_prefix = ? WHERE id = ?');
-  const migrate = db.transaction((entries) => {
-    for (const row of entries) {
-      update.run(createHash('sha256').update(row.key).digest('hex'), row.key.slice(0, 8), row.id);
-    }
-  });
-  migrate(rows);
-  db.exec('ALTER TABLE api_keys DROP COLUMN key');
-  console.log(`[db] Migration: hashed ${rows.length} API key(s)`);
+if (keyCols.includes('key')) {
+  // Add hash columns if not yet present (handles partial-migration state)
+  if (!keyCols.includes('key_hash'))   db.exec('ALTER TABLE api_keys ADD COLUMN key_hash TEXT');
+  if (!keyCols.includes('key_prefix')) db.exec('ALTER TABLE api_keys ADD COLUMN key_prefix TEXT');
+
+  // Compute hashes for any rows not yet migrated
+  const unhashed = db.prepare('SELECT id, key FROM api_keys WHERE key_hash IS NULL').all();
+  if (unhashed.length > 0) {
+    const update = db.prepare('UPDATE api_keys SET key_hash = ?, key_prefix = ? WHERE id = ?');
+    db.transaction((rows) => {
+      for (const row of rows) {
+        update.run(createHash('sha256').update(row.key).digest('hex'), row.key.slice(0, 8), row.id);
+      }
+    })(unhashed);
+  }
+
+  // Rebuild table to remove the key column (standard SQLite pattern for constrained columns)
+  db.exec(`
+    CREATE TABLE api_keys_new (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      key_hash   TEXT NOT NULL,
+      key_prefix TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      last_used  TEXT
+    );
+    INSERT INTO api_keys_new SELECT id, name, key_hash, key_prefix, created_at, last_used FROM api_keys;
+    DROP TABLE api_keys;
+    ALTER TABLE api_keys_new RENAME TO api_keys;
+  `);
+  console.log('[db] Migration: API key hashing complete');
 }
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)');
 
