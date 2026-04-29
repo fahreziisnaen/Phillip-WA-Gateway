@@ -10,7 +10,8 @@ export async function getLogsController(req, res) {
     const to     = req.query.to     || null;
     const cursor = req.query.cursor || null;
     const status = req.query.status || null;
-    const result = getLogs({ limit, from, to, cursor, status });
+    const search = req.query.search ? req.query.search.trim() : null;
+    const result = getLogs({ limit, from, to, cursor, status, search });
     return res.json(result);
   } catch (err) {
     console.error('[getLogs]', err);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Settings as SettingsIcon,
   Users,
@@ -33,6 +33,9 @@ import {
   removeAllowedIp,
 } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import Pagination from '../components/Pagination.jsx';
+
+const ALIAS_PAGE_SIZE = 15;
 
 const TABS = [
   { id: 'apikeys', label: 'API Keys', Icon: Key },
@@ -482,6 +485,7 @@ function GroupAliasesTab() {
   const [form, setForm] = useState({ alias: '', jid: '', label: '' });
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(null);
+  const [page, setPage] = useState(1);
 
   async function load() {
     setLoading(true);
@@ -496,6 +500,13 @@ function GroupAliasesTab() {
   }
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(1); }, [aliases]);
+
+  const totalAliasPages = Math.ceil(aliases.length / ALIAS_PAGE_SIZE);
+  const pagedAliases = useMemo(
+    () => aliases.slice((page - 1) * ALIAS_PAGE_SIZE, page * ALIAS_PAGE_SIZE),
+    [aliases, page],
+  );
 
   function showFlash(type, text) {
     setFlash({ type, text });
@@ -623,9 +634,9 @@ function GroupAliasesTab() {
           </div>
         )}
 
-        {aliases.length > 0 && (
+        {pagedAliases.length > 0 && (
           <ul className="divide-y divide-gray-50">
-            {aliases.map((a) => (
+            {pagedAliases.map((a) => (
               <li key={a.alias} className="flex items-center gap-4 px-5 py-3.5 group">
                 <div className="w-8 h-8 bg-wa-green/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Hash className="w-4 h-4 text-wa-teal" />
@@ -669,6 +680,14 @@ function GroupAliasesTab() {
           </ul>
         )}
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={totalAliasPages}
+        total={aliases.length}
+        pageSize={ALIAS_PAGE_SIZE}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

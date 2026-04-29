@@ -4,6 +4,7 @@ import { jwtMiddleware } from '../middlewares/jwt.middleware.js';
 import { loginController } from '../controllers/auth.controller.js';
 import { sendMessageController } from '../controllers/message.controller.js';
 import { getLogsController } from '../controllers/log.controller.js';
+import { getAuditLogsController } from '../controllers/audit.controller.js';
 import { getStatusController } from '../controllers/status.controller.js';
 import {
   listInstancesController,
@@ -58,6 +59,7 @@ export function registerRoutes(app) {
 
   // Logs
   app.get('/logs', jwtMiddleware, getLogsController);
+  app.get('/admin/audit-logs', jwtMiddleware, getAuditLogsController);
 
   // Users
   app.get('/admin/users', jwtMiddleware, getUsersController);

@@ -3,6 +3,7 @@ import {
   createUser,
   changePassword,
   deleteUser,
+  findByUsername,
 } from '../services/user.service.js';
 
 import {
@@ -11,6 +12,9 @@ import {
   revokeKey,
   maskKey,
 } from '../services/apikey.service.js';
+
+import { addAuditLog } from '../services/audit.service.js';
+import { getSourceIp } from '../utils/request.utils.js';
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
@@ -32,6 +36,11 @@ export async function createUserController(req, res) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     const user = await createUser(username, password);
+    addAuditLog({
+      actor: req.user?.username, actorId: req.user?.id,
+      action: 'user.create', details: { username },
+      ip: getSourceIp(req),
+    });
     return res.status(201).json(user);
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -45,7 +54,14 @@ export async function changePasswordController(req, res) {
     if (!password || password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
+    const target = getAllUsers().find((u) => u.id === id);
     await changePassword(id, password);
+    addAuditLog({
+      actor: req.user?.username, actorId: req.user?.id,
+      action: 'user.password_change',
+      details: { targetUser: target?.username ?? id },
+      ip: getSourceIp(req),
+    });
     return res.json({ success: true });
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -55,11 +71,16 @@ export async function changePasswordController(req, res) {
 export async function deleteUserController(req, res) {
   try {
     const { id } = req.params;
-    // Prevent self-deletion
     if (req.user?.id === id) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
+    const target = getAllUsers().find((u) => u.id === id);
     await deleteUser(id);
+    addAuditLog({
+      actor: req.user?.username, actorId: req.user?.id,
+      action: 'user.delete', details: { username: target?.username ?? id },
+      ip: getSourceIp(req),
+    });
     return res.json({ success: true });
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -88,6 +109,12 @@ export async function createKeyController(req, res) {
       return res.status(400).json({ error: 'Key name is required' });
     }
     const entry = await createKey(name.trim());
+    addAuditLog({
+      actor: req.user?.username, actorId: req.user?.id,
+      action: 'apikey.create',
+      details: { keyName: entry.name, keyPrefix: entry.key_prefix },
+      ip: getSourceIp(req),
+    });
     // Return full key ONCE — this is the only time it's visible
     return res.status(201).json(entry);
   } catch (err) {
@@ -97,7 +124,15 @@ export async function createKeyController(req, res) {
 
 export async function revokeKeyController(req, res) {
   try {
+    const keys = getAllKeys();
+    const target = keys.find((k) => k.id === req.params.id);
     await revokeKey(req.params.id);
+    addAuditLog({
+      actor: req.user?.username, actorId: req.user?.id,
+      action: 'apikey.revoke',
+      details: { keyName: target?.name ?? req.params.id },
+      ip: getSourceIp(req),
+    });
     return res.json({ success: true });
   } catch (err) {
     return res.status(400).json({ error: err.message });

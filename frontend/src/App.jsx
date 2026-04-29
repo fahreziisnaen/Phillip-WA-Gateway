@@ -10,6 +10,7 @@ import Logs from './pages/Logs.jsx';
 import Settings from './pages/Settings.jsx';
 import Login from './pages/Login.jsx';
 import Docs from './pages/Docs.jsx';
+import AuditLogs from './pages/AuditLogs.jsx';
 import { fetchStatus } from './services/api.js';
 
 function ProtectedApp() {
@@ -71,6 +72,7 @@ function ProtectedApp() {
         <Route path="/groups" element={<Groups />} />
         <Route path="/logs" element={<Logs />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/audit" element={<AuditLogs />} />
         <Route path="/docs" element={<Docs instances={instances} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

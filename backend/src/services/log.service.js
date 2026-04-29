@@ -18,7 +18,7 @@ export function addLog({ instanceId = null, instancePhone = null, id, recipientN
   return { timestamp, sourceIp, instanceId, instancePhone, id, recipientName, message, status, error: error ?? null };
 }
 
-export function getLogs({ limit = 100, from = null, to = null, cursor = null, status = null } = {}) {
+export function getLogs({ limit = 100, from = null, to = null, cursor = null, status = null, search = null } = {}) {
   const dateConditions = [];
   const dateParams = [];
 
@@ -50,6 +50,11 @@ export function getLogs({ limit = 100, from = null, to = null, cursor = null, st
   if (status) {
     conditions.push('status = ?');
     params.push(status);
+  }
+  if (search) {
+    const like = `%${search}%`;
+    conditions.push('(instance_id LIKE ? OR source_ip LIKE ? OR recipient_id LIKE ? OR recipient_name LIKE ? OR message LIKE ?)');
+    params.push(like, like, like, like, like);
   }
   if (cursor) {
     conditions.push('id < ?');

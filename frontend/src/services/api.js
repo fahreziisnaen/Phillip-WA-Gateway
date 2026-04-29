@@ -44,12 +44,13 @@ export const fetchInstanceQR = (id) => api.get(`/instances/${id}/qr`);
 export const fetchInstanceGroups = (id) => api.get(`/instances/${id}/groups`);
 
 // ── Other dashboard endpoints ─────────────────────────────────────────────────
-export const fetchLogs = ({ limit = 100, from, to, cursor, status } = {}) => {
+export const fetchLogs = ({ limit = 100, from, to, cursor, status, search } = {}) => {
   const params = new URLSearchParams({ limit });
-  if (from)   params.set('from', from);
-  if (to)     params.set('to', to);
-  if (cursor) params.set('cursor', cursor);
+  if (from)               params.set('from', from);
+  if (to)                 params.set('to', to);
+  if (cursor)             params.set('cursor', cursor);
   if (status && status !== 'all') params.set('status', status);
+  if (search?.trim())     params.set('search', search.trim());
   return api.get(`/logs?${params}`);
 };
 
@@ -82,5 +83,16 @@ export const addAllowedIp = (ip, label) =>
   api.post('/admin/allowed-ips', { ip, label });
 export const removeAllowedIp = (ip) =>
   api.delete(`/admin/allowed-ips/${encodeURIComponent(ip)}`);
+
+// ── Audit Logs ────────────────────────────────────────────────────────────────
+export const fetchAuditLogs = ({ limit = 100, cursor, from, to, action, actor } = {}) => {
+  const params = new URLSearchParams({ limit });
+  if (cursor)       params.set('cursor', cursor);
+  if (from)         params.set('from', from);
+  if (to)           params.set('to', to);
+  if (action)       params.set('action', action);
+  if (actor?.trim()) params.set('actor', actor.trim());
+  return api.get(`/admin/audit-logs?${params}`);
+};
 
 export default api;

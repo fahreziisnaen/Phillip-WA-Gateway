@@ -3,7 +3,7 @@ import {
   ScrollText, RefreshCw, CheckCircle2, XCircle, Clock,
   BarChart3, Smartphone, Globe, Users, Phone,
   ChevronDown, ChevronUp,
-  CalendarDays, X,
+  CalendarDays, X, Search,
 } from 'lucide-react';
 import { fetchLogs } from '../services/api.js';
 
@@ -43,6 +43,14 @@ export default function Logs() {
   const [dateTo, setDateTo]           = useState('');
   const [cursor, setCursor]           = useState(null);
   const [hasMore, setHasMore]         = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch]           = useState('');
+
+  // Debounce search input 400 ms
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -53,6 +61,7 @@ export default function Logs() {
         from: dateFrom || undefined,
         to: dateTo || undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: search || undefined,
       });
       const { logs: newLogs, hasMore: more, nextCursor: nc, stats: newStats } = res.data;
       setLogs(newLogs);
@@ -64,7 +73,7 @@ export default function Logs() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, statusFilter]);
+  }, [dateFrom, dateTo, statusFilter, search]);
 
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore) return;
@@ -74,6 +83,7 @@ export default function Logs() {
         from: dateFrom || undefined,
         to: dateTo || undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: search || undefined,
         cursor,
       });
       const { logs: moreLogs, hasMore: more, nextCursor: nc } = res.data;
@@ -85,7 +95,7 @@ export default function Logs() {
     } finally {
       setLoadingMore(false);
     }
-  }, [cursor, dateFrom, dateTo, statusFilter, loadingMore]);
+  }, [cursor, dateFrom, dateTo, statusFilter, search, loadingMore]);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
   useEffect(() => {
@@ -95,6 +105,7 @@ export default function Logs() {
 
   const successRate = stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 0;
   const hasDateFilter = dateFrom || dateTo;
+  const hasSearch = !!search;
 
   function toggleStatus(val) {
     setStatusFilter((prev) => (prev === val ? 'all' : val));
@@ -188,6 +199,26 @@ export default function Logs() {
         </div>
       </div>
 
+      {/* ── Search bar ── */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search by instance, IP, recipient, or message…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-full pl-10 pr-9 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wa-green/40 focus:border-wa-green transition"
+        />
+        {searchInput && (
+          <button
+            onClick={() => { setSearchInput(''); setSearch(''); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* ── Stats cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
@@ -225,9 +256,9 @@ export default function Logs() {
       </div>
 
       {/* Active filter badges */}
-      {(statusFilter !== 'all' || hasDateFilter) && (
+      {(statusFilter !== 'all' || hasDateFilter || hasSearch) && (
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="text-gray-500">Showing:</span>
+          <span className="text-gray-500">Filters:</span>
 
           {hasDateFilter && (
             <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">
@@ -247,10 +278,17 @@ export default function Logs() {
             </span>
           )}
 
+          {hasSearch && (
+            <span className="flex items-center gap-1 bg-purple-50 text-purple-700 px-2.5 py-1 rounded-full">
+              <Search className="w-3 h-3" />
+              "{search}"
+            </span>
+          )}
+
           <span className="text-gray-400">{logs.length} entries loaded</span>
 
           <button
-            onClick={() => { setStatusFilter('all'); clearDateFilter(); }}
+            onClick={() => { setStatusFilter('all'); clearDateFilter(); setSearchInput(''); setSearch(''); }}
             className="text-gray-400 hover:text-gray-700 underline ml-1"
           >
             Clear all

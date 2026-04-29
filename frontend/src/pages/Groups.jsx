@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Users, Search, Copy, Check, RefreshCw, Info, Smartphone, Hash, X, Plus, Trash2 } from 'lucide-react';
 import { fetchInstances, fetchGroups, fetchGroupAliases, setGroupAlias, deleteGroupAlias } from '../services/api.js';
+import Pagination from '../components/Pagination.jsx';
+
+const PAGE_SIZE = 50;
 
 export default function Groups() {
   const [instances, setInstances] = useState([]);
@@ -12,6 +15,7 @@ export default function Groups() {
   const [copied, setCopied] = useState(null);
   const [aliasModal, setAliasModal] = useState(null); // { id, name, existingAlias? }
   const [aliasMap, setAliasMap] = useState({}); // jid → { alias, label }
+  const [page, setPage] = useState(1);
 
   const loadAliases = useCallback(async () => {
     try {
@@ -70,6 +74,15 @@ export default function Groups() {
     );
   }, [groups, search, aliasMap]);
 
+  // Reset page when search changes or a new instance is selected
+  useEffect(() => setPage(1), [search, selectedId]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page],
+  );
+
   async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
@@ -105,7 +118,7 @@ export default function Groups() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Groups</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {groups.length} group{groups.length !== 1 ? 's' : ''}
+            {search.trim() ? `${filtered.length} of ${groups.length}` : groups.length} group{groups.length !== 1 ? 's' : ''}
             {selectedId && ` on ${instances.find(i => i.id === selectedId)?.name ?? selectedId}`}
           </p>
         </div>
@@ -186,9 +199,9 @@ export default function Groups() {
             No groups match <strong>"{search}"</strong>
           </div>
         )}
-        {filtered.length > 0 && (
+        {paginated.length > 0 && (
           <ul className="divide-y divide-gray-50">
-            {filtered.map((group) => (
+            {paginated.map((group) => (
               <li key={group.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors group">
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor(group.id)}`}>
                   {initials(group.name) || '?'}
@@ -227,6 +240,14 @@ export default function Groups() {
           </ul>
         )}
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={filtered.length}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
 
       {/* Alias modal */}
       {aliasModal && (
