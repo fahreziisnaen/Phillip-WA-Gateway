@@ -16,7 +16,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,7 +47,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/health" ]
       interval: 15s
       timeout: 5s
       start_period: 20s
@@ -72,7 +72,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/" ]
       interval: 30s
       timeout: 5s
       start_period: 10s
@@ -96,7 +96,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost/"]
+      test: [ "CMD", "curl", "-sf", "http://localhost/" ]
       interval: 30s
       timeout: 5s
       start_period: 15s
@@ -107,7 +107,9 @@ services:
 # ── Volumes ───────────────────────────────────────────────────────────────────
 volumes:
   redis_data:
+    name: wa-redis-data
   db_data:
+    name: wa-db-data
 
 # ── Networks ──────────────────────────────────────────────────────────────────
 networks:
